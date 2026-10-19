@@ -1,0 +1,44 @@
+pmf_version: "0.1.0"
+kind: "design"
+project:
+  name: "toy_project"
+  description: "Demo order-processing service with a four-layer architecture (UI -> Services -> DB -> Models)"
+
+subsystems:
+  - id: "ui"
+    name: "UI / Presentation"
+    description: "Command-line interface and formatting of replies to the user"
+    paths:
+      - "app/ui/**"
+  - id: "services"
+    name: "Application Services"
+    description: "Order business logic, discount calculation and orchestration"
+    paths:
+      - "app/services/**"
+  - id: "db"
+    name: "Database / Persistence"
+    description: "Repositories and the low-level storage connection"
+    paths:
+      - "app/db/**"
+  - id: "models"
+    name: "Domain Models"
+    description: "Domain entities and data structures"
+    paths:
+      - "app/models/**"
+
+allowed_dependencies:
+  - from: "ui"
+    to: "services"
+    description: "The UI calls the service layer to run business operations"
+  - from: "ui"
+    to: "models"
+    description: "The UI uses domain models to display data"
+  - from: "services"
+    to: "db"
+    description: "Services store and read data through the database repositories"
+  - from: "services"
+    to: "models"
+    description: "Services work with domain entities"
+  - from: "db"
+    to: "models"
+    description: "Repositories serialise and deserialise domain models"

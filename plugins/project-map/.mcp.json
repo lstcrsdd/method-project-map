@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "pmap": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/pmap",
+      "args": [
+        "mcp"
+      ],
+      "env": {
+        "PMAP_REPO": "${CLAUDE_PROJECT_DIR}"
+      }
+    }
+  }
+}

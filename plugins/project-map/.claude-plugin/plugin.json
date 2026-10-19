@@ -1,0 +1,19 @@
+{
+  "name": "project-map",
+  "version": "0.2.0",
+  "description": "Static, LLM-free map of a Python repository: packages, modules, classes, functions and the links between them, for agents (overview at session start, find/show/source tools) and people (interactive web view).",
+  "author": {
+    "name": "lstcrsdd",
+    "url": "https://github.com/lstcrsdd"
+  },
+  "homepage": "https://github.com/lstcrsdd/method-project-map",
+  "repository": "https://github.com/lstcrsdd/method-project-map",
+  "license": "MIT",
+  "keywords": [
+    "code map",
+    "architecture",
+    "navigation",
+    "python",
+    "mcp"
+  ]
+}

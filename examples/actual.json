@@ -1,0 +1,896 @@
+{
+  "pmf_version": "0.2.0",
+  "kind": "actual",
+  "generated_at": "2026-10-18T22:32:17Z",
+  "repo_root": "toy_project",
+  "scanner": {
+    "name": "pmap-python-ast",
+    "version": "0.2.0"
+  },
+  "import_roots": [
+    "."
+  ],
+  "errors": [],
+  "nodes": [
+    {
+      "id": "mod:app.db",
+      "kind": "module",
+      "name": "db",
+      "qualified_name": "app.db",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Database package for toy_project.",
+      "location": {
+        "path": "app/db/__init__.py",
+        "line_start": 1,
+        "line_end": 1,
+        "file_hash": "sha256:d9beaaa4f2de79c5561d4ac8074cefd99f67cc8a708b37e77824bf9ed8b73500"
+      }
+    },
+    {
+      "id": "mod:app.db.connection",
+      "kind": "module",
+      "name": "connection",
+      "qualified_name": "app.db.connection",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Low-level database connection and storage.",
+      "location": {
+        "path": "app/db/connection.py",
+        "line_start": 1,
+        "line_end": 21,
+        "file_hash": "sha256:068cbbd345f13f56f880a6771aaedc4e8527accc08f4db89782d49a35ee67a0c"
+      }
+    },
+    {
+      "id": "mod:app.db.repository",
+      "kind": "module",
+      "name": "repository",
+      "qualified_name": "app.db.repository",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Repository implementations for domain entities.",
+      "location": {
+        "path": "app/db/repository.py",
+        "line_start": 1,
+        "line_end": 24,
+        "file_hash": "sha256:6d69e2a35226eff4064b7218f6564cbca9c52b6a3438b419ab588be12b30fc1c"
+      }
+    },
+    {
+      "id": "mod:app.models",
+      "kind": "module",
+      "name": "models",
+      "qualified_name": "app.models",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Models package for toy_project.",
+      "location": {
+        "path": "app/models/__init__.py",
+        "line_start": 1,
+        "line_end": 1,
+        "file_hash": "sha256:3fe6ea949176316d16af3437411d30d82a03e4466b95f875b02e533dcb355dbe"
+      }
+    },
+    {
+      "id": "mod:app.models.order",
+      "kind": "module",
+      "name": "order",
+      "qualified_name": "app.models.order",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Domain models for orders.",
+      "location": {
+        "path": "app/models/order.py",
+        "line_start": 1,
+        "line_end": 16,
+        "file_hash": "sha256:e0079461d1dd36a89376a50e28277281bb0e48def00d47e7b5139d13c77b3322"
+      }
+    },
+    {
+      "id": "mod:app.services",
+      "kind": "module",
+      "name": "services",
+      "qualified_name": "app.services",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Services package for toy_project.",
+      "location": {
+        "path": "app/services/__init__.py",
+        "line_start": 1,
+        "line_end": 1,
+        "file_hash": "sha256:15c6c1746cc2e5fe43b69dce19559b5205639e008320d8e71529fd55f246e861"
+      }
+    },
+    {
+      "id": "mod:app.services.order_service",
+      "kind": "module",
+      "name": "order_service",
+      "qualified_name": "app.services.order_service",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Business logic for creating and processing customer orders.",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line_start": 1,
+        "line_end": 32,
+        "file_hash": "sha256:c66cc3d46655f4dd9bddb2da54585a46f4b1c4cd8e582c09d9b248c1b3abe817"
+      }
+    },
+    {
+      "id": "mod:app.ui",
+      "kind": "module",
+      "name": "ui",
+      "qualified_name": "app.ui",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "UI package for toy_project.",
+      "location": {
+        "path": "app/ui/__init__.py",
+        "line_start": 1,
+        "line_end": 1,
+        "file_hash": "sha256:73b5f4394cd4d150367c62b570fd2bfe22b51f4d6b30ceda06411a1282c7c57f"
+      }
+    },
+    {
+      "id": "mod:app.ui.cli",
+      "kind": "module",
+      "name": "cli",
+      "qualified_name": "app.ui.cli",
+      "parent_id": null,
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Command-line interface for interacting with the order system.",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line_start": 1,
+        "line_end": 24,
+        "file_hash": "sha256:f2ddf78b7322f88504f2f1faedd1d7dcc7f8f84364401a386e6ab609796356e8"
+      }
+    },
+    {
+      "id": "sym:app.db.connection:DatabaseConnection",
+      "kind": "class",
+      "name": "DatabaseConnection",
+      "qualified_name": "app.db.connection.DatabaseConnection",
+      "parent_id": "mod:app.db.connection",
+      "external": false,
+      "signature": null,
+      "docstring_summary": "In-memory database connection handle.",
+      "location": {
+        "path": "app/db/connection.py",
+        "line_start": 6,
+        "line_end": 14,
+        "file_hash": "sha256:068cbbd345f13f56f880a6771aaedc4e8527accc08f4db89782d49a35ee67a0c"
+      }
+    },
+    {
+      "id": "sym:app.db.connection:DatabaseConnection.execute_insert",
+      "kind": "method",
+      "name": "execute_insert",
+      "qualified_name": "app.db.connection.DatabaseConnection.execute_insert",
+      "parent_id": "sym:app.db.connection:DatabaseConnection",
+      "external": false,
+      "signature": "(self, record: dict) -> int",
+      "docstring_summary": "Insert a raw record into storage and return its assigned ID.",
+      "location": {
+        "path": "app/db/connection.py",
+        "line_start": 9,
+        "line_end": 14,
+        "file_hash": "sha256:068cbbd345f13f56f880a6771aaedc4e8527accc08f4db89782d49a35ee67a0c"
+      }
+    },
+    {
+      "id": "sym:app.db.connection:execute_raw_sql",
+      "kind": "function",
+      "name": "execute_raw_sql",
+      "qualified_name": "app.db.connection.execute_raw_sql",
+      "parent_id": "mod:app.db.connection",
+      "external": false,
+      "signature": "(query: str) -> list[dict]",
+      "docstring_summary": "Execute a raw query directly against the storage engine.",
+      "location": {
+        "path": "app/db/connection.py",
+        "line_start": 17,
+        "line_end": 21,
+        "file_hash": "sha256:068cbbd345f13f56f880a6771aaedc4e8527accc08f4db89782d49a35ee67a0c"
+      }
+    },
+    {
+      "id": "sym:app.db.repository:BaseRepository",
+      "kind": "class",
+      "name": "BaseRepository",
+      "qualified_name": "app.db.repository.BaseRepository",
+      "parent_id": "mod:app.db.repository",
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Base repository providing connection lifecycle.",
+      "location": {
+        "path": "app/db/repository.py",
+        "line_start": 7,
+        "line_end": 11,
+        "file_hash": "sha256:6d69e2a35226eff4064b7218f6564cbca9c52b6a3438b419ab588be12b30fc1c"
+      }
+    },
+    {
+      "id": "sym:app.db.repository:BaseRepository.__init__",
+      "kind": "method",
+      "name": "__init__",
+      "qualified_name": "app.db.repository.BaseRepository.__init__",
+      "parent_id": "sym:app.db.repository:BaseRepository",
+      "external": false,
+      "signature": "(self) -> None",
+      "docstring_summary": null,
+      "location": {
+        "path": "app/db/repository.py",
+        "line_start": 10,
+        "line_end": 11,
+        "file_hash": "sha256:6d69e2a35226eff4064b7218f6564cbca9c52b6a3438b419ab588be12b30fc1c"
+      }
+    },
+    {
+      "id": "sym:app.db.repository:OrderRepository",
+      "kind": "class",
+      "name": "OrderRepository",
+      "qualified_name": "app.db.repository.OrderRepository",
+      "parent_id": "mod:app.db.repository",
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Persistence repository for Order entities.",
+      "location": {
+        "path": "app/db/repository.py",
+        "line_start": 14,
+        "line_end": 24,
+        "file_hash": "sha256:6d69e2a35226eff4064b7218f6564cbca9c52b6a3438b419ab588be12b30fc1c"
+      }
+    },
+    {
+      "id": "sym:app.db.repository:OrderRepository.save_order",
+      "kind": "method",
+      "name": "save_order",
+      "qualified_name": "app.db.repository.OrderRepository.save_order",
+      "parent_id": "sym:app.db.repository:OrderRepository",
+      "external": false,
+      "signature": "(self, order: Order) -> int",
+      "docstring_summary": "Persist a validated Order instance.",
+      "location": {
+        "path": "app/db/repository.py",
+        "line_start": 17,
+        "line_end": 24,
+        "file_hash": "sha256:6d69e2a35226eff4064b7218f6564cbca9c52b6a3438b419ab588be12b30fc1c"
+      }
+    },
+    {
+      "id": "sym:app.models.order:Order",
+      "kind": "class",
+      "name": "Order",
+      "qualified_name": "app.models.order.Order",
+      "parent_id": "mod:app.models.order",
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Represents a customer order in the system.",
+      "location": {
+        "path": "app/models/order.py",
+        "line_start": 6,
+        "line_end": 16,
+        "file_hash": "sha256:e0079461d1dd36a89376a50e28277281bb0e48def00d47e7b5139d13c77b3322"
+      }
+    },
+    {
+      "id": "sym:app.models.order:Order.is_valid",
+      "kind": "method",
+      "name": "is_valid",
+      "qualified_name": "app.models.order.Order.is_valid",
+      "parent_id": "sym:app.models.order:Order",
+      "external": false,
+      "signature": "(self) -> bool",
+      "docstring_summary": "Check whether the order has a positive amount and customer name.",
+      "location": {
+        "path": "app/models/order.py",
+        "line_start": 14,
+        "line_end": 16,
+        "file_hash": "sha256:e0079461d1dd36a89376a50e28277281bb0e48def00d47e7b5139d13c77b3322"
+      }
+    },
+    {
+      "id": "sym:app.services.order_service:OrderService",
+      "kind": "class",
+      "name": "OrderService",
+      "qualified_name": "app.services.order_service.OrderService",
+      "parent_id": "mod:app.services.order_service",
+      "external": false,
+      "signature": null,
+      "docstring_summary": "Orchestrates order validation, pricing, and persistence.",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line_start": 15,
+        "line_end": 32,
+        "file_hash": "sha256:c66cc3d46655f4dd9bddb2da54585a46f4b1c4cd8e582c09d9b248c1b3abe817"
+      }
+    },
+    {
+      "id": "sym:app.services.order_service:OrderService.__init__",
+      "kind": "method",
+      "name": "__init__",
+      "qualified_name": "app.services.order_service.OrderService.__init__",
+      "parent_id": "sym:app.services.order_service:OrderService",
+      "external": false,
+      "signature": "(self) -> None",
+      "docstring_summary": null,
+      "location": {
+        "path": "app/services/order_service.py",
+        "line_start": 18,
+        "line_end": 19,
+        "file_hash": "sha256:c66cc3d46655f4dd9bddb2da54585a46f4b1c4cd8e582c09d9b248c1b3abe817"
+      }
+    },
+    {
+      "id": "sym:app.services.order_service:OrderService.create_order",
+      "kind": "method",
+      "name": "create_order",
+      "qualified_name": "app.services.order_service.OrderService.create_order",
+      "parent_id": "sym:app.services.order_service:OrderService",
+      "external": false,
+      "signature": "(self, customer: str, amount: float, hook: Any=...) -> Order",
+      "docstring_summary": "Create, validate, and persist a new order.",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line_start": 21,
+        "line_end": 32,
+        "file_hash": "sha256:c66cc3d46655f4dd9bddb2da54585a46f4b1c4cd8e582c09d9b248c1b3abe817"
+      }
+    },
+    {
+      "id": "sym:app.services.order_service:validate_discount",
+      "kind": "function",
+      "name": "validate_discount",
+      "qualified_name": "app.services.order_service.validate_discount",
+      "parent_id": "mod:app.services.order_service",
+      "external": false,
+      "signature": "(amount: float) -> float",
+      "docstring_summary": "Apply standard volume discount if threshold is met.",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line_start": 8,
+        "line_end": 12,
+        "file_hash": "sha256:c66cc3d46655f4dd9bddb2da54585a46f4b1c4cd8e582c09d9b248c1b3abe817"
+      }
+    },
+    {
+      "id": "sym:app.ui.cli:debug_dump_database",
+      "kind": "function",
+      "name": "debug_dump_database",
+      "qualified_name": "app.ui.cli.debug_dump_database",
+      "parent_id": "mod:app.ui.cli",
+      "external": false,
+      "signature": "() -> list[dict]",
+      "docstring_summary": "Quick debug helper that violates layered architecture by querying DB directly.",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line_start": 22,
+        "line_end": 24,
+        "file_hash": "sha256:f2ddf78b7322f88504f2f1faedd1d7dcc7f8f84364401a386e6ab609796356e8"
+      }
+    },
+    {
+      "id": "sym:app.ui.cli:format_receipt",
+      "kind": "function",
+      "name": "format_receipt",
+      "qualified_name": "app.ui.cli.format_receipt",
+      "parent_id": "mod:app.ui.cli",
+      "external": false,
+      "signature": "(order: Order) -> str",
+      "docstring_summary": "Format an Order object into a human-readable receipt.",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line_start": 10,
+        "line_end": 12,
+        "file_hash": "sha256:f2ddf78b7322f88504f2f1faedd1d7dcc7f8f84364401a386e6ab609796356e8"
+      }
+    },
+    {
+      "id": "sym:app.ui.cli:handle_create_order",
+      "kind": "function",
+      "name": "handle_create_order",
+      "qualified_name": "app.ui.cli.handle_create_order",
+      "parent_id": "mod:app.ui.cli",
+      "external": false,
+      "signature": "(customer: str, amount: float) -> str",
+      "docstring_summary": "CLI handler to create a new order via OrderService.",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line_start": 15,
+        "line_end": 19,
+        "file_hash": "sha256:f2ddf78b7322f88504f2f1faedd1d7dcc7f8f84364401a386e6ab609796356e8"
+      }
+    },
+    {
+      "id": "ext:dataclasses",
+      "kind": "module",
+      "name": "dataclasses",
+      "qualified_name": "dataclasses",
+      "parent_id": null,
+      "external": true,
+      "signature": null,
+      "docstring_summary": null,
+      "location": null
+    },
+    {
+      "id": "ext:typing",
+      "kind": "module",
+      "name": "typing",
+      "qualified_name": "typing",
+      "parent_id": null,
+      "external": true,
+      "signature": null,
+      "docstring_summary": null,
+      "location": null
+    }
+  ],
+  "edges": [
+    {
+      "from": "mod:app.db.connection",
+      "to": "sym:app.db.connection:DatabaseConnection",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/connection.py",
+        "line": 6
+      }
+    },
+    {
+      "from": "sym:app.db.connection:DatabaseConnection",
+      "to": "sym:app.db.connection:DatabaseConnection.execute_insert",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/connection.py",
+        "line": 9
+      }
+    },
+    {
+      "from": "mod:app.db.connection",
+      "to": "sym:app.db.connection:execute_raw_sql",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/connection.py",
+        "line": 17
+      }
+    },
+    {
+      "from": "mod:app.db.repository",
+      "to": "sym:app.db.repository:BaseRepository",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 7
+      }
+    },
+    {
+      "from": "sym:app.db.repository:BaseRepository",
+      "to": "sym:app.db.repository:BaseRepository.__init__",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 10
+      }
+    },
+    {
+      "from": "mod:app.db.repository",
+      "to": "sym:app.db.repository:OrderRepository",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 14
+      }
+    },
+    {
+      "from": "sym:app.db.repository:OrderRepository",
+      "to": "sym:app.db.repository:OrderRepository.save_order",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 17
+      }
+    },
+    {
+      "from": "mod:app.models.order",
+      "to": "sym:app.models.order:Order",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/models/order.py",
+        "line": 6
+      }
+    },
+    {
+      "from": "sym:app.models.order:Order",
+      "to": "sym:app.models.order:Order.is_valid",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/models/order.py",
+        "line": 14
+      }
+    },
+    {
+      "from": "mod:app.services.order_service",
+      "to": "sym:app.services.order_service:validate_discount",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 8
+      }
+    },
+    {
+      "from": "mod:app.services.order_service",
+      "to": "sym:app.services.order_service:OrderService",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 15
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService",
+      "to": "sym:app.services.order_service:OrderService.__init__",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 18
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService",
+      "to": "sym:app.services.order_service:OrderService.create_order",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 21
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "sym:app.ui.cli:format_receipt",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 10
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "sym:app.ui.cli:handle_create_order",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 15
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "sym:app.ui.cli:debug_dump_database",
+      "kind": "contains",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": null,
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 22
+      }
+    },
+    {
+      "from": "mod:app.db.repository",
+      "to": "mod:app.db.connection",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.db.connection.DatabaseConnection",
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 3
+      }
+    },
+    {
+      "from": "mod:app.db.repository",
+      "to": "mod:app.models.order",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.models.order.Order",
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 4
+      }
+    },
+    {
+      "from": "mod:app.models.order",
+      "to": "ext:dataclasses",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "dataclasses",
+      "location": {
+        "path": "app/models/order.py",
+        "line": 3
+      }
+    },
+    {
+      "from": "mod:app.services.order_service",
+      "to": "ext:typing",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "typing",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 3
+      }
+    },
+    {
+      "from": "mod:app.services.order_service",
+      "to": "mod:app.db.repository",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.db.repository.OrderRepository",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 4
+      }
+    },
+    {
+      "from": "mod:app.services.order_service",
+      "to": "mod:app.models.order",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.models.order.Order",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 5
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "mod:app.db.connection",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.db.connection.execute_raw_sql",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 5
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "mod:app.models.order",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.models.order.Order",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 6
+      }
+    },
+    {
+      "from": "mod:app.ui.cli",
+      "to": "mod:app.services.order_service",
+      "kind": "imports",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "app.services.order_service.OrderService",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 7
+      }
+    },
+    {
+      "from": "sym:app.db.repository:OrderRepository",
+      "to": "sym:app.db.repository:BaseRepository",
+      "kind": "inherits",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "BaseRepository",
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 14
+      }
+    },
+    {
+      "from": "sym:app.db.repository:BaseRepository.__init__",
+      "to": "sym:app.db.connection:DatabaseConnection",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "DatabaseConnection",
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 11
+      }
+    },
+    {
+      "from": "sym:app.db.repository:OrderRepository.save_order",
+      "to": "sym:app.db.connection:DatabaseConnection.execute_insert",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "self.conn.execute_insert",
+      "location": {
+        "path": "app/db/repository.py",
+        "line": 24
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.__init__",
+      "to": "sym:app.db.repository:OrderRepository",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "OrderRepository",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 19
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.create_order",
+      "to": "sym:app.services.order_service:validate_discount",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "validate_discount",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 23
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.create_order",
+      "to": "sym:app.models.order:Order",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "Order",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 24
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.create_order",
+      "to": "sym:app.models.order:Order.is_valid",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "order.is_valid",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 25
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.create_order",
+      "to": "sym:app.db.repository:OrderRepository.save_order",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "self.repo.save_order",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 27
+      }
+    },
+    {
+      "from": "sym:app.services.order_service:OrderService.create_order",
+      "to": "unresolved:hook.on_order_created",
+      "kind": "calls",
+      "confidence": "unresolved",
+      "source": "python-ast-v0",
+      "target_symbol": "hook.on_order_created",
+      "location": {
+        "path": "app/services/order_service.py",
+        "line": 31
+      }
+    },
+    {
+      "from": "sym:app.ui.cli:handle_create_order",
+      "to": "sym:app.services.order_service:OrderService",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "OrderService",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 17
+      }
+    },
+    {
+      "from": "sym:app.ui.cli:handle_create_order",
+      "to": "sym:app.services.order_service:OrderService.create_order",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "service.create_order",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 18
+      }
+    },
+    {
+      "from": "sym:app.ui.cli:handle_create_order",
+      "to": "sym:app.ui.cli:format_receipt",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "format_receipt",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 19
+      }
+    },
+    {
+      "from": "sym:app.ui.cli:debug_dump_database",
+      "to": "sym:app.db.connection:execute_raw_sql",
+      "kind": "calls",
+      "confidence": "resolved",
+      "source": "python-ast-v0",
+      "target_symbol": "execute_raw_sql",
+      "location": {
+        "path": "app/ui/cli.py",
+        "line": 24
+      }
+    }
+  ]
+}

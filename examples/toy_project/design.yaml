@@ -1,0 +1,44 @@
+pmf_version: "0.1.0"
+kind: "design"
+project:
+  name: "toy_project"
+  description: "Демонстрационный сервис обработки заказов с четырёхслойной архитектурой (UI -> Services -> DB -> Models)"
+
+subsystems:
+  - id: "ui"
+    name: "UI / Presentation"
+    description: "CLI-интерфейс и форматирование ответов пользователю"
+    paths:
+      - "app/ui/**"
+  - id: "services"
+    name: "Application Services"
+    description: "Бизнес-логика заказов, расчёт скидок и оркестрация"
+    paths:
+      - "app/services/**"
+  - id: "db"
+    name: "Database / Persistence"
+    description: "Репозитории и низкоуровневое подключение к хранилищу"
+    paths:
+      - "app/db/**"
+  - id: "models"
+    name: "Domain Models"
+    description: "Доменные сущности и структуры данных"
+    paths:
+      - "app/models/**"
+
+allowed_dependencies:
+  - from: "ui"
+    to: "services"
+    description: "UI вызывает сервисный слой для выполнения бизнес-операций"
+  - from: "ui"
+    to: "models"
+    description: "UI использует доменные модели для отображения данных"
+  - from: "services"
+    to: "db"
+    description: "Сервисы сохраняют и читают данные через репозитории БД"
+  - from: "services"
+    to: "models"
+    description: "Сервисы оперируют доменными сущностями"
+  - from: "db"
+    to: "models"
+    description: "Репозитории сериализуют и десериализуют доменные модели"

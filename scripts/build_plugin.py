@@ -1,0 +1,124 @@
+"""Build the agent plugin bundle in plugins/project-map/ (Claude Code + Codex) from the pmap package.
+
+Run after changing pmap/: python3 scripts/build_plugin.py
+The bundle carries its own copy of pmap (lib/pmap) so installed plugins do not depend on this checkout.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from pmap import __version__  # noqa: E402
+from pmap.connect import BOOTSTRAP  # noqa: E402
+
+PLUGIN = ROOT / "plugins" / "project-map"
+DESCRIPTION = ("Static, LLM-free map of a Python repository: packages, modules, classes, functions and the links between "
+               "them, for agents (overview at session start, find/show/source tools) and people (interactive web view).")
+
+
+def write(path: Path, text: str, mode: int = 0o644) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.encode("utf-8"))  # exact line endings (\r\n only where written, e.g. .cmd files)
+    path.chmod(mode)
+
+
+def write_json(path: Path, data: dict) -> None:
+    write(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def build() -> Path:
+    for _ in range(3):  # some volumes delete `._*` sidecar files on their own while rmtree runs
+        if PLUGIN.exists():
+            shutil.rmtree(PLUGIN, ignore_errors=True)
+    shutil.copytree(ROOT / "pmap", PLUGIN / "lib" / "pmap", ignore=shutil.ignore_patterns("__pycache__", "._*", "*.pyc"))
+
+    write(PLUGIN / "bin" / "pmap", f"""#!/bin/sh
+# Method Project Map CLI bundled with the plugin; Claude Code puts this directory on the Bash tool's PATH.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$(command -v python3 || command -v python)"
+if [ -z "$PY" ]; then echo "pmap: Python 3.9+ is required" >&2; exit 1; fi
+exec "$PY" -I -c "{BOOTSTRAP}" "$DIR/lib" "$@"
+""", 0o755)
+    write(PLUGIN / "bin" / "pmap.cmd", "@echo off\r\nrem Method Project Map CLI bundled with the plugin\r\n"
+          "set \"PMAP_LIB=%~dp0..\\lib\"\r\n"
+          "where py >nul 2>nul\r\n"
+          "if errorlevel 1 (set \"PMAP_PY=python\") else (set \"PMAP_PY=py -3\")\r\n"
+          f"%PMAP_PY% -I -c \"{BOOTSTRAP}\" \"%PMAP_LIB%\" %*\r\n")
+
+    skill = (ROOT / "pmap" / "agent" / "SKILL.md").read_text(encoding="utf-8").replace("{{PMAP}}", "pmap")
+    skill = skill.replace(
+        "Command: `pmap` (run from the repository root; `--repo <dir>` elsewhere).",
+        "Command: `pmap` (on PATH in Claude Code with this plugin; otherwise install the CLI with install.sh / "
+        "install.bat). Run it from the repository root, or pass `--repo <dir>`. When using the MCP tools, pass "
+        "`repo` = the absolute repository root.")
+    write(PLUGIN / "skills" / "project-map" / "SKILL.md", skill)
+
+    # ---- Claude Code
+    write_json(PLUGIN / ".claude-plugin" / "plugin.json", {
+        "name": "project-map",
+        "version": __version__,
+        "description": DESCRIPTION,
+        "author": {"name": "lstcrsdd", "url": "https://github.com/lstcrsdd"},
+        "homepage": "https://github.com/lstcrsdd/method-project-map",
+        "repository": "https://github.com/lstcrsdd/method-project-map",
+        "license": "MIT",
+        "keywords": ["code map", "architecture", "navigation", "python", "mcp"],
+    })
+    write_json(PLUGIN / "hooks" / "hooks.json", {"hooks": {"SessionStart": [{
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pmap\" hook session-start", "timeout": 30}],
+    }]}})
+    write_json(PLUGIN / ".mcp.json", {"mcpServers": {"pmap": {
+        "command": "${CLAUDE_PLUGIN_ROOT}/bin/pmap",
+        "args": ["mcp"],
+        "env": {"PMAP_REPO": "${CLAUDE_PROJECT_DIR}"},
+    }}})
+
+    # ---- Codex
+    write_json(PLUGIN / ".codex-plugin" / "plugin.json", {
+        "name": "project-map",
+        "version": __version__,
+        "description": DESCRIPTION,
+        "author": {"name": "lstcrsdd", "url": "https://github.com/lstcrsdd"},
+        "keywords": ["code map", "architecture", "navigation", "python", "mcp"],
+        "skills": "./skills/",
+        "mcpServers": "./.codex-mcp.json",
+        "interface": {
+            "displayName": "Method Project Map",
+            "shortDescription": "Map of the repository's structure and links",
+            "longDescription": DESCRIPTION,
+            "developerName": "lstcrsdd",
+            "category": "Developer Tools",
+            "capabilities": ["Read"],
+            "defaultPrompt": ["Give me an overview of this repository", "Who calls this function?"],
+        },
+    })
+    write_json(PLUGIN / ".codex-mcp.json", {"mcpServers": {"pmap": {
+        "command": "/bin/sh",
+        "args": ["-c", "exec ./bin/pmap mcp"],
+        "cwd": ".",
+        "tool_timeout_sec": 120,
+    }}})
+
+    write(PLUGIN / "README.md", f"""# Method Project Map plugin (Claude Code + Codex)
+
+Version {__version__}. Generated by `scripts/build_plugin.py` — edit `pmap/` and rebuild instead of editing here.
+
+- Claude Code: skill `project-map`, a SessionStart hook that adds a project overview to new sessions in Python
+  repositories, the `pmap` CLI on the Bash PATH, and the `pmap` MCP server (tools `pmap_overview`, `pmap_find`,
+  `pmap_show`, `pmap_source`, `pmap_check`, `pmap_stale`, `pmap_scan`).
+- Codex: the same skill and MCP server (pass `repo` to the tools).
+
+Needs Python 3.9+ on PATH. Do not combine with `pmap connect --claude` (both add the session-start overview).
+""")
+    return PLUGIN
+
+
+if __name__ == "__main__":
+    print(build())

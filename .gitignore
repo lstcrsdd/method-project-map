@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+__pycache__/
+*.pyc
+.pmap/
+!examples/toy_project/.pmap/
+bench/results/
+
+# macOS AppleDouble sidecars created on non-HFS volumes
+._*

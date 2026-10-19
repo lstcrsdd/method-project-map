@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "method-project-map"
+version = "0.2.0"
+description = "Method Project Map — a static, LLM-free map of Python projects for people and AI coding agents"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "lstcrsdd" }]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["architecture", "code map", "static analysis", "ai agents", "mcp", "reflexion model"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/lstcrsdd/method-project-map"
+Repository = "https://github.com/lstcrsdd/method-project-map"
+Issues = "https://github.com/lstcrsdd/method-project-map/issues"
+
+[project.scripts]
+pmap = "pmap.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["pmap*"]
+
+[tool.setuptools.package-data]
+pmap = ["web/static/*.html", "agent/*.md"]

@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method Project Map</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #18202c; --muted: #677285; --line: #e2e6ec; --accent: #2563eb;
+  --card: #ffffff; --card-line: #d5dbe4; --band: #eef1f5; --uses: #2563eb; --usedby: #059669; --warn: #dc2626;
+  --maybe: #b7791f; --chip: #edf1f6; --dim: .22; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #11141a; --panel: #181c24; --ink: #e7eaf0; --muted: #96a0b2; --line: #2a303b; --accent: #6b9dff;
+    --card: #1e232d; --card-line: #353d4b; --band: #161a21; --uses: #6b9dff; --usedby: #34d399; --warn: #f87171;
+    --maybe: #e2b04a; --chip: #252b36; --shadow: none; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
+button { font: inherit; }
+header { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 650; white-space: nowrap; }
+.brand svg { width: 22px; height: 22px; color: var(--accent); }
+#crumbs { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+#crumbs button { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 2px 4px; }
+#crumbs button.current { color: var(--ink); font-weight: 600; cursor: default; }
+#crumbs .sep { color: var(--muted); }
+.search { position: relative; }
+#search { width: 240px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+#results { position: absolute; top: 36px; right: 0; width: 440px; max-width: 92vw; max-height: 60vh; overflow: auto; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.2); display: none; z-index: 30; }
+#results div { padding: 7px 12px; cursor: pointer; border-bottom: 1px solid var(--line); }
+#results div.active, #results div:hover { background: var(--chip); }
+.hbtn { background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+.hbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--usedby); margin-right: 5px; }
+main { display: grid; grid-template-columns: 250px minmax(0, 1fr) 380px; height: calc(100% - 53px); }
+aside { background: var(--panel); overflow: auto; min-height: 0; }
+#tree { border-right: 1px solid var(--line); padding: 10px 0; font-size: 13px; }
+#tree .ttl { padding: 0 12px 6px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.tn { padding: 2px 10px 2px calc(10px + var(--d) * 14px); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tn:hover { background: var(--chip); } .tn.sel { background: var(--accent); color: #fff; }
+.tn .tw { display: inline-block; width: 14px; color: var(--muted); } .tn.sel .tw { color: #fff; }
+#stage { overflow: auto; min-height: 0; position: relative; }
+#intro { padding: 14px 22px 4px; color: var(--muted); }
+#intro b { color: var(--ink); }
+.legend { display: inline-flex; gap: 14px; margin-left: 10px; font-size: 12px; }
+.legend i { display: inline-block; width: 22px; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+#board { position: relative; padding: 8px 22px 40px; }
+#wires { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+#wires path { fill: none; stroke-width: 2; opacity: .85; }
+#wires .uses { stroke: var(--uses); } #wires .usedby { stroke: var(--usedby); }
+#wires .warn { stroke: var(--warn); stroke-width: 2.6; } #wires .maybe { stroke: var(--maybe); stroke-dasharray: 5 4; }
+#wires .unused { stroke: var(--muted); stroke-dasharray: 2 5; }
+#wires text { font-size: 11px; fill: var(--warn); font-weight: 600; }
+.band { background: var(--band); border-radius: 12px; padding: 10px 12px 12px; margin-bottom: 14px; }
+.band h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.band h4 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.cards { display: flex; flex-wrap: wrap; gap: 10px; }
+.card { width: 230px; background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 9px 11px; cursor: pointer;
+  box-shadow: var(--shadow); transition: opacity .12s, border-color .12s; position: relative; }
+.card:hover { border-color: var(--accent); }
+.card .t { font-weight: 600; word-break: break-word; }
+.card .d { color: var(--muted); font-size: 12.5px; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card .m { color: var(--muted); font-size: 11.5px; margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+.card .tag { font-size: 10.5px; padding: 0 6px; border-radius: 8px; background: var(--chip); color: var(--muted); }
+.card.sel { border: 2px solid var(--ink); padding: 8px 10px; }
+.card.uses { border-color: var(--uses); } .card.usedby { border-color: var(--usedby); } .card.both { border-color: var(--warn); }
+.card.dim { opacity: var(--dim); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 12px; }
+.chips .lbl { color: var(--muted); font-size: 12px; margin-right: 4px; }
+.chip { background: var(--chip); border: 1px solid var(--line); border-radius: 14px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.flow { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.3fr) minmax(180px, 1fr); gap: 46px; align-items: start; }
+.col h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.col .card { width: auto; margin-bottom: 10px; }
+.sym { background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.sym .hd { padding: 8px 11px; cursor: pointer; border-radius: 10px; }
+.sym .hd .k { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.sym .hd .n { font-weight: 600; font-family: var(--mono); font-size: 13px; word-break: break-word; }
+.sym .hd .s { font-family: var(--mono); font-size: 11.5px; color: var(--muted); word-break: break-word; }
+.sym .rows { border-top: 1px solid var(--line); padding: 4px 0; }
+.sym .row { padding: 3px 11px; font-family: var(--mono); font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.sym .row span:last-child { color: var(--muted); font-family: var(--font); font-size: 11px; white-space: nowrap; }
+.sym .hd:hover, .sym .row:hover { background: var(--chip); }
+.sym .sel { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--chip); }
+.sym.dim, .card.dim { opacity: var(--dim); }
+.via { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; word-break: break-word; }
+.more { color: var(--muted); font-size: 12px; padding: 4px 2px; }
+#details { border-left: 1px solid var(--line); padding: 16px 18px; }
+#details h2 { margin: 2px 0 4px; font-size: 17px; word-break: break-word; }
+#details h3 { margin: 18px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kind { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.path { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+.sig { font-family: var(--mono); font-size: 12px; background: var(--chip); padding: 7px 9px; border-radius: 8px; word-break: break-word; }
+.list div { padding: 4px 0; border-bottom: 1px dashed var(--line); word-break: break-word; }
+.list a, a.lnk { color: var(--accent); cursor: pointer; text-decoration: none; }
+.pill { font-size: 10.5px; padding: 1px 7px; border-radius: 9px; margin-right: 6px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.pill.ok { color: var(--usedby); } .pill.maybe { color: var(--maybe); } .pill.warn { color: var(--warn); }
+.ln { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+pre.src { font-family: var(--mono); font-size: 11.5px; background: var(--chip); padding: 9px; border-radius: 8px; overflow: auto; max-height: 55vh; white-space: pre; }
+.muted { color: var(--muted); } .warn { color: var(--warn); }
+.btn { background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 11px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 60; }
+.modal .box { background: var(--panel); border-radius: 12px; padding: 18px 20px; width: min(680px, 94vw); max-height: 88vh; overflow: auto; }
+.modal h2 { margin: 0 0 10px; font-size: 18px; }
+.modal textarea { width: 100%; height: 48vh; font-family: var(--mono); font-size: 12px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.modal label { display: block; margin: 8px 0; }
+.modal .res { font-family: var(--mono); font-size: 12px; background: var(--chip); border-radius: 8px; padding: 8px; white-space: pre-wrap; margin-top: 10px; display: none; }
+.modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.projbtn { background: none; border: 1px solid transparent; border-radius: 8px; color: var(--ink); font-weight: 650; padding: 3px 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; max-width: 260px; }
+.projbtn:hover { border-color: var(--line); background: var(--chip); }
+.projbtn #project { overflow: hidden; text-overflow: ellipsis; }
+.projbtn .caret { color: var(--muted); font-size: 11px; }
+.modal h3 { margin: 16px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.projnow { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--chip); padding: 8px 10px; border-radius: 8px; margin: 4px 0 4px; }
+.projnow .path { color: var(--ink); }
+.projrow { display: flex; gap: 8px; margin-top: 4px; }
+.projrow input { flex: 1; min-width: 0; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 12px var(--mono); }
+.projpick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#projRecent a { color: var(--accent); cursor: pointer; font-weight: 600; }
+.modal .res.err { color: var(--warn); }
+.modal .box.wide { width: min(980px, 96vw); }
+.helphead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.helphead h2 { margin: 0; }
+.helpbody { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 18px; }
+#helpToc { border-right: 1px solid var(--line); padding-right: 10px; max-height: 66vh; overflow: auto; }
+#helpToc a { display: block; padding: 4px 8px; border-radius: 6px; cursor: pointer; color: var(--ink); font-size: 13px; }
+#helpToc a:hover { background: var(--chip); }
+#helpText { max-height: 66vh; overflow: auto; padding-right: 8px; }
+#helpText section { padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+#helpText h3 { margin: 14px 0 6px; font-size: 15px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+#helpText p, #helpText li { line-height: 1.55; }
+#helpText ul { padding-left: 20px; margin: 6px 0; }
+#helpText pre.src { max-height: none; }
+#tourDim { position: fixed; inset: 0; z-index: 70; display: none; }
+#tourHi { position: fixed; z-index: 71; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.5); outline: 2px solid var(--accent); pointer-events: none; display: none; transition: left .2s, top .2s, width .2s, height .2s; }
+#tourPop { position: fixed; z-index: 72; width: min(370px, calc(100vw - 24px)); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.35); display: none; }
+#tourPop h3 { margin: 2px 0 6px; font-size: 16px; }
+#tourPop p { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+#tourPop .tstep { font-size: 11px; color: var(--muted); }
+#tourPop .trow { display: flex; gap: 8px; align-items: center; }
+#tourPop .trow .gap { flex: 1; }
+#toast { position: fixed; right: 16px; bottom: 16px; z-index: 65; width: min(360px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); display: none; }
+#toast p { margin: 0 0 10px; }
+#toast .trow { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 700px) { .helpbody { grid-template-columns: 1fr; } #helpToc { display: none; } }
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
+  #tree { max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--line); } #details { border-left: 0; border-top: 1px solid var(--line); }
+  .flow { grid-template-columns: 1fr; gap: 16px; } header { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="8.5" y="16" width="7" height="5" rx="1.5"/><path d="M6.5 8v3.5h11V8M12 11.5V16"/></svg><button id="projectBtn" class="projbtn" data-tt="projectTitle"><span id="project">Method Project Map</span><span class="caret">▾</span></button></div>
+  <nav id="crumbs"></nav>
+  <div class="search"><input id="search" data-tp="search" autocomplete="off"><div id="results"></div></div>
+  <select id="view" class="hbtn" data-tt="viewTitle"><option value="pkg" data-t="viewPkg"></option><option value="design" data-t="viewDesign"></option></select>
+  <button class="hbtn" id="maybe" data-tt="maybeTitle"></button>
+  <button class="hbtn" id="mermaidBtn" data-tt="mermaidTitle">Mermaid</button>
+  <button class="hbtn" id="langBtn" data-tt="langTitle" data-t="langBtn"></button>
+  <button class="hbtn" id="helpBtn" data-tt="helpTitle">?</button>
+  <button class="hbtn primary" id="connectBtn" data-tt="connectTitle" data-t="connect"></button>
+  <span id="status"></span>
+</header>
+<main>
+  <aside id="tree"></aside>
+  <section id="stage"><div id="intro"></div><div id="board"></div></section>
+  <aside id="details"></aside>
+</main>
+
+<div class="modal" id="mermaidModal"><div class="box"><h2 data-t="mermaidHead"></h2><textarea id="mmd" readonly></textarea>
+  <div class="row"><button class="btn" id="copyMmd" data-t="copy"></button><button class="btn" data-close data-t="close"></button></div></div></div>
+
+<div class="modal" id="helpModal"><div class="box wide">
+  <div class="helphead"><h2 data-t="helpHead"></h2><button class="btn primary" id="tourBtn" data-t="tourStart"></button></div>
+  <div class="helpbody"><nav id="helpToc"></nav><div id="helpText"></div></div>
+  <div class="row"><button class="btn" data-close data-t="close"></button></div></div></div>
+
+<div class="modal" id="connectModal"><div class="box"><h2 data-t="connHead"></h2>
+  <p class="muted" data-t="connText"></p>
+  <div id="connState" class="muted" data-t="checking"></div>
+  <label><input type="checkbox" id="cClaude" checked> <span data-th="connClaude"></span></label>
+  <label><input type="checkbox" id="cCodex"> <span data-th="connCodex"></span></label>
+  <div class="res" id="connRes"></div>
+  <div class="row"><button class="btn" id="disconnectBtn" data-t="disconnect"></button><button class="btn" data-close data-t="close"></button><button class="btn primary" id="doConnect" data-t="doConnect"></button></div></div></div>
+
+<div class="modal" id="projectModal"><div class="box"><h2 data-t="projHead"></h2>
+  <div class="muted" data-t="projNow"></div>
+  <div class="projnow"><div class="path" id="projPath"></div><button class="btn" id="projReveal"></button></div>
+  <h3 data-t="projOther"></h3>
+  <div class="projpick"><button class="btn primary" id="projPick"></button><span class="muted" id="projPickHint"></span></div>
+  <div class="muted" style="margin-top:10px" data-t="projPathLabel"></div>
+  <div class="projrow"><input id="projInput" autocomplete="off" spellcheck="false" data-tp="projPathPlaceholder"><button class="btn" id="projOpen" data-t="open"></button></div>
+  <div class="res" id="projRes"></div>
+  <h3 data-t="projRecent"></h3><div class="list" id="projRecent"></div>
+  <div class="row"><button class="btn" data-close data-t="close"></button></div></div></div>
+
+<div id="tourDim"></div><div id="tourHi"></div><div id="tourPop" role="dialog" aria-live="polite"></div>
+<div id="toast" role="dialog"><p data-t="toastText"></p><div class="trow"><button class="btn" id="toastLater" data-t="toastLater"></button><button class="btn primary" id="toastStart" data-t="tourStart"></button></div></div>
+
+<script id="pmap-data" type="application/json">__PMAP_DATA__</script>
+<script id="pmap-token" type="application/json">"__PMAP_TOKEN__"</script>
+<script>
+"use strict";
+const LIVE = __PMAP_LIVE__;
+const TOKEN = JSON.parse(document.getElementById("pmap-token").textContent);
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+let DATA = null, IX = null;
+const S = { scope: { type: "root" }, sel: null, maybe: false, view: "pkg", version: null, open: new Set(), wires: [] };
+let PROJ = null;  // live mode: { path, name, recent, platform, can_pick }
+
+// ======================================================================== language
+
+let LANG = (() => {
+  const asked = /[?&]lang=(en|ru)(&|$)/.exec(location.search);  // page.html?lang=en, e.g. for a link on a website
+  if (asked) return asked[1];
+  try { const v = localStorage.getItem("pmap.lang"); if (v === "en" || v === "ru") return v; } catch (err) { /* storage blocked */ }
+  return (navigator.language || "").toLowerCase().startsWith("ru") ? "ru" : "en";
+})();
+
+const PL = {
+  en: { file: ["file", "files"], package: ["package", "packages"], link: ["link", "links"], violation: ["violation", "violations"], line: ["line", "lines"] },
+  ru: { file: ["файл", "файла", "файлов"], package: ["пакет", "пакета", "пакетов"], link: ["связь", "связи", "связей"], violation: ["нарушение", "нарушения", "нарушений"], line: ["строка", "строки", "строк"] },
+};
+function pl(n, key) {
+  const f = PL[LANG][key];
+  if (LANG === "ru") { const a = n % 10, b = n % 100; return `${n} ${f[a === 1 && b !== 11 ? 0 : a >= 2 && a <= 4 && (b < 12 || b > 14) ? 1 : 2]}`; }
+  return `${n} ${f[n === 1 ? 0 : 1]}`;
+}
+
+const L = {
+  en: {
+    search: "Find a class, function or file  ( / )", viewTitle: "What the overview shows", viewPkg: "Packages", viewDesign: "Design",
+    maybeTitle: "Also show links the analyser could not prove (dashed)", maybe: (on) => "Possible links: " + (on ? "on" : "off"),
+    mermaidTitle: "Mermaid text of what is on screen", helpTitle: "How to read this map",
+    langBtn: "RU", langTitle: "Показать на русском",
+    connect: "Connect to AI", connected: "AI connected ✓", connectTitle: "Give Claude Code / Codex access to project maps",
+    projectTitle: "Open another project", live: "live", staticCopy: "static file", stopped: "stopped — open Method Project Map again", scanned: (d) => "scanned " + d,
+    mermaidHead: "Mermaid for this view", copy: "Copy", copied: "Copied", close: "Close",
+    helpHead: "Method Project Map — guide",
+    connHead: "Connect project maps to your AI agents",
+    connText: "Installs the Method Project Map skill and, for Claude Code, a session-start hook that hands Claude an overview of every Python project it opens. Only files under your home folder are changed, with backups; “Disconnect” removes everything again.",
+    checking: "Checking…",
+    connClaude: "Claude Code — skill + overview at every session start + MCP tools when the <code>claude</code> CLI is available",
+    connCodex: "Codex — skill + MCP server + a rule in <code>~/.codex/AGENTS.md</code>",
+    disconnect: "Disconnect", doConnect: "Connect", isConnected: "connected", notConnected: "not connected",
+    connState: (c, x) => `Claude Code: ${c} · Codex: ${x}`, noServer: "Cannot reach the local server.", working: "Working…", done: "done",
+    staticConnectTitle: "Run `pmap connect` in a terminal (a static export cannot change settings)",
+    staticConnect: "This is a static export. To connect agents, run in a terminal:\n\n  pmap connect --claude\n\n(or use install.sh / install.bat)",
+    projHead: "Project", projNow: "Showing now:", projOther: "Open another project",
+    projPick: "Choose a folder…", projPickHint: { mac: "opens a Finder window", windows: "opens an Explorer window", linux: "opens the system folder dialog" },
+    projPathLabel: "…or paste the full path of a project folder:", projPathPlaceholder: "/Users/me/code/my-project",
+    projRecent: "Recent projects", projNone: "No other projects yet.", projPrompt: "Choose a project folder for Method Project Map",
+    projWaiting: { mac: "Choose a folder in the Finder window…", windows: "Choose a folder in the Explorer window…", linux: "Choose a folder in the dialog…" }, projScanning: "Reading the project…", projCancelled: "No folder chosen.",
+    projStatic: "This page is a static export of one project. To browse other projects run:\n\n  pmap serve <folder> --open",
+    err_empty: () => "Type a folder path first.", err_relative: () => "Use a full path, e.g. /Users/me/code/project or C:\\code\\project.",
+    err_not_dir: (p) => `Not a folder: ${p}`, err_no_python: (p) => `No Python files in ${p}.`,
+    err_too_wide: () => "That is too wide (a home folder, a disk or thousands of projects). Choose one project folder.",
+    showIn: { mac: "Show in Finder", windows: "Show in Explorer", linux: "Open folder" },
+    all: "All", topLayer: "Top layer <span>— uses the layers below; nothing here is used by them</span>",
+    foundation: "Foundation <span>— used by the layers above, depends on nothing in this view</span>", layer: (n) => "Layer " + n,
+    overviewIntro: (n) => `<b>${n}</b> stacked by dependency. Click a card to see what it uses and what uses it; double-click to open it.`,
+    uses: "uses", usedBy: "used by", usesN: (n) => "uses " + n, usedByN: (n) => "used by " + n, widelyUsed: "widely used", entryPoint: "entry point",
+    pkgIntro: (name, doc) => `<b>${name}</b> — ${doc}. Each card is a file; click it to see links inside the package, double-click to open its classes and functions.`,
+    usesPkgs: "Uses packages:", usedByPkgs: "Used by packages:", noFiles: "This package has no code files.",
+    subIntro: (name, paths) => `<b>${name}</b> — files mapped to this subsystem by <code>design.yaml</code> (${paths}).`,
+    designIntro: (c, d, a) => `<b>Design view</b> — the intended architecture from <code>design.yaml</code> checked against the code: <b style="color:var(--usedby)">${c}</b> allowed and used, <b class="warn">${d}</b> not allowed, <b>${a}</b> allowed but unused.`,
+    allowedUsed: "allowed &amp; used", notAllowed: "not allowed", unused: "unused", allowedUnused: "allowed, unused", notAllowedN: (n) => `not allowed (${n})`,
+    libraries: (n) => `Libraries (${n})`, importsThisFile: "imports this file", importsIt: "imports it", usesPrefix: "uses ",
+    externalLib: "external library", more: (n) => `+${n} more`, nothing: "nothing", noSymbols: "No classes or functions — module-level code only.",
+    modIntro: (file, pkg, doc) => `<b>${file}</b> in ${pkg} — ${doc}. `, noDescription: "no description",
+    onlyLinksOf: (name) => `Showing only the links of <b>${name}</b> — <a class="lnk" id="clearSel">show all</a>.`,
+    clickSymbol: "Click a class or function to see exactly who calls it and what it calls.",
+    colUsedBy: (n) => `Used by (${pl(n, "file")})`, colInside: "Inside this file", colUses: (n, libs) => `Uses (${pl(n, "file")}${libs ? " + libraries" : ""})`,
+    inOut: (a, b) => `${a} in · ${b} out`,
+    kinds: { class: "class", function: "function", method: "method", module: "file (module)" },
+    crumbDesign: "Design", crumbAll: "All packages", files: "Files", topLevel: "(top level)", rootSuffix: " (root)",
+    linkKinds: { i: "imports", c: "calls", h: "inherits from" },
+    confirmed: "confirmed", possible: "possible", confirmedTitle: "Proven by static analysis (resolved)", possibleTitle: "Likely but not proven (inferred)",
+    notAllowedTitle: "Not allowed by design.yaml", library: "(library)", lineN: (s) => "line " + s,
+    externalText: "Code outside this repository; its insides are not mapped.",
+    whatItIs: "What it is", signature: "Signature", partOf: "Part of", contains: (n) => `Contains (${n})`, usesH: "Uses", usedByH: "Used by",
+    unresolvedCalls: (n) => `Calls the map could not resolve (${n})`, actions: "Actions", open: "Open", showSource: "Show source",
+    package: "package", openPackage: "Open package", filesN: (n) => `Files (${n})`, usesPackagesH: "Uses packages", usedByPackagesH: "Used by packages",
+    subsystem: "subsystem (design)", openSubsystem: "Open subsystem", relations: "Relations", none: "none", nLinks: (n) => pl(n, "link"),
+    howToRead: "How to read", howToReadText: "Left: files that use this one. Middle: what is defined here. Right: what this file uses. Click a class or function to narrow the picture to its own callers and callees.",
+    wholeFile: "Show the whole file", project: "project", folder: "Folder", anotherProject: "Open another project…", size: "Size",
+    sizeLine: (p, f, s) => `${pl(p, "package")} · ${pl(f, "file")} · ${s} classes, functions and methods`,
+    linksLine: (c, m, u) => `<span class="pill ok">confirmed</span>${c} links · <span class="pill maybe">possible</span>${m} · <span class="pill">unresolved calls</span>${u}`,
+    designCheck: "Design check", allowedUsedN: (n) => `${n} allowed &amp; used`, notAllowedCount: (n) => `${n} not allowed`, unusedN: (n) => `${n} unused`,
+    unreadable: (n) => `Files the map could not read (${n})`, startHere: "Start here",
+    startText: "The cards are the packages of your code, stacked in layers: the top layer is where things start (entry points, wiring), the bottom one is the foundation. Click any card to see its links. Press <b>?</b> for a short guide.",
+    fileKind: "file", noMatch: "no match", noData: "No map data.",
+  },
+  ru: {
+    search: "Найти класс, функцию или файл  ( / )", viewTitle: "Что показывает обзор", viewPkg: "Пакеты", viewDesign: "Архитектура",
+    maybeTitle: "Показать и связи, которые анализ не смог доказать (пунктиром)", maybe: (on) => "Возможные связи: " + (on ? "вкл" : "выкл"),
+    mermaidTitle: "Текст Mermaid для того, что на экране", helpTitle: "Как читать карту",
+    langBtn: "EN", langTitle: "Show in English",
+    connect: "Подключить к ИИ", connected: "ИИ подключён ✓", connectTitle: "Дать Claude Code / Codex доступ к картам проектов",
+    projectTitle: "Открыть другой проект", live: "онлайн", staticCopy: "файл-снимок", stopped: "остановлена — запустите Method Project Map снова", scanned: (d) => "просканировано " + d,
+    mermaidHead: "Mermaid для этого вида", copy: "Копировать", copied: "Скопировано", close: "Закрыть",
+    helpHead: "Method Project Map — справочник",
+    connHead: "Подключить карты проектов к ИИ-агентам",
+    connText: "Устанавливает навык Method Project Map, а для Claude Code ещё и хук начала сессии: Claude получает обзор каждого Python-проекта, который открывает. Меняются только файлы в вашей домашней папке, с резервными копиями; «Отключить» убирает всё обратно.",
+    checking: "Проверяю…",
+    connClaude: "Claude Code — навык + обзор в начале каждой сессии + MCP-инструменты, если установлен CLI <code>claude</code>",
+    connCodex: "Codex — навык + MCP-сервер + правило в <code>~/.codex/AGENTS.md</code>",
+    disconnect: "Отключить", doConnect: "Подключить", isConnected: "подключён", notConnected: "не подключён",
+    connState: (c, x) => `Claude Code: ${c} · Codex: ${x}`, noServer: "Нет связи с локальным сервером.", working: "Выполняю…", done: "готово",
+    staticConnectTitle: "Выполните `pmap connect` в терминале (статичный файл не может менять настройки)",
+    staticConnect: "Это статичный снимок карты. Чтобы подключить агентов, выполните в терминале:\n\n  pmap connect --claude\n\n(или запустите install.sh / install.bat)",
+    projHead: "Проект", projNow: "Сейчас открыт:", projOther: "Открыть другой проект",
+    projPick: "Выбрать папку…", projPickHint: { mac: "откроется окно Finder", windows: "откроется окно Проводника", linux: "откроется системное окно выбора папки" },
+    projPathLabel: "…или вставьте полный путь к папке проекта:", projPathPlaceholder: "/Users/me/code/my-project",
+    projRecent: "Недавние проекты", projNone: "Других проектов пока нет.", projPrompt: "Выберите папку проекта для Method Project Map",
+    projWaiting: { mac: "Выберите папку в окне Finder…", windows: "Выберите папку в окне Проводника…", linux: "Выберите папку в окне выбора…" }, projScanning: "Читаю проект…", projCancelled: "Папка не выбрана.",
+    projStatic: "Эта страница — статичный снимок одного проекта. Чтобы открывать другие проекты, запустите:\n\n  pmap serve <папка> --open",
+    err_empty: () => "Сначала введите путь к папке.", err_relative: () => "Нужен полный путь, например /Users/me/code/project или C:\\code\\project.",
+    err_not_dir: (p) => `Это не папка: ${p}`, err_no_python: (p) => `В папке нет Python-файлов: ${p}`,
+    err_too_wide: () => "Слишком широко (домашняя папка, диск целиком или тысячи проектов). Выберите папку одного проекта.",
+    showIn: { mac: "Показать в Finder", windows: "Показать в Проводнике", linux: "Открыть папку" },
+    all: "Все", topLayer: "Верхний слой <span>— пользуется слоями ниже; его самого никто не использует</span>",
+    foundation: "Фундамент <span>— им пользуются слои выше, сам ни от чего здесь не зависит</span>", layer: (n) => "Слой " + n,
+    overviewIntro: (n) => `<b>${n}</b>, разложены по зависимостям. Клик по карточке — что она использует и кто использует её; двойной клик — открыть.`,
+    uses: "использует", usedBy: "используют его", usesN: (n) => "использует: " + n, usedByN: (n) => "используют его: " + n, widelyUsed: "используется многими", entryPoint: "точка входа",
+    pkgIntro: (name, doc) => `<b>${name}</b> — ${doc}. Каждая карточка — файл; клик покажет его связи внутри пакета, двойной клик откроет его классы и функции.`,
+    usesPkgs: "Использует пакеты:", usedByPkgs: "Его используют пакеты:", noFiles: "В этом пакете нет файлов с кодом.",
+    subIntro: (name, paths) => `<b>${name}</b> — файлы, отнесённые к этой подсистеме в <code>design.yaml</code> (${paths}).`,
+    designIntro: (c, d, a) => `<b>Архитектура</b> — задуманная архитектура из <code>design.yaml</code>, сверенная с кодом: <b style="color:var(--usedby)">${c}</b> разрешено и используется, <b class="warn">${d}</b> не разрешено, <b>${a}</b> разрешено, но не используется.`,
+    allowedUsed: "разрешено и используется", notAllowed: "не разрешено", unused: "не используется", allowedUnused: "разрешено, не используется", notAllowedN: (n) => `не разрешено (${n})`,
+    libraries: (n) => `Библиотеки (${n})`, importsThisFile: "импортирует этот файл", importsIt: "импортирует его", usesPrefix: "использует ",
+    externalLib: "внешняя библиотека", more: (n) => `ещё ${n}`, nothing: "ничего", noSymbols: "Нет классов и функций — только код на уровне модуля.",
+    modIntro: (file, pkg, doc) => `<b>${file}</b> в пакете ${pkg} — ${doc}. `, noDescription: "без описания",
+    onlyLinksOf: (name) => `Показаны только связи <b>${name}</b> — <a class="lnk" id="clearSel">показать все</a>.`,
+    clickSymbol: "Нажмите на класс или функцию, чтобы увидеть, кто именно её вызывает и что вызывает она.",
+    colUsedBy: (n) => `Кто использует (${pl(n, "file")})`, colInside: "Что внутри файла", colUses: (n, libs) => `Что использует (${pl(n, "file")}${libs ? " + библиотеки" : ""})`,
+    inOut: (a, b) => `${a} вх. · ${b} исх.`,
+    kinds: { class: "класс", function: "функция", method: "метод", module: "файл (модуль)" },
+    crumbDesign: "Архитектура", crumbAll: "Все пакеты", files: "Файлы", topLevel: "(верхний уровень)", rootSuffix: " (корень)",
+    linkKinds: { i: "импортирует", c: "вызывает", h: "наследует" },
+    confirmed: "подтверждена", possible: "возможна", confirmedTitle: "Доказано статическим анализом (resolved)", possibleTitle: "Вероятно, но не доказано (inferred)",
+    notAllowedTitle: "Не разрешено в design.yaml", library: "(библиотека)", lineN: (s) => "строка " + s,
+    externalText: "Код вне этого репозитория; его устройство на карте не показано.",
+    whatItIs: "Что это", signature: "Сигнатура", partOf: "Входит в", contains: (n) => `Содержит (${n})`, usesH: "Использует", usedByH: "Кто использует",
+    unresolvedCalls: (n) => `Вызовы, которые карта не смогла определить (${n})`, actions: "Действия", open: "Открыть", showSource: "Показать код",
+    package: "пакет", openPackage: "Открыть пакет", filesN: (n) => `Файлы (${n})`, usesPackagesH: "Использует пакеты", usedByPackagesH: "Его используют пакеты",
+    subsystem: "подсистема (design)", openSubsystem: "Открыть подсистему", relations: "Связи", none: "нет", nLinks: (n) => pl(n, "link"),
+    howToRead: "Как читать", howToReadText: "Слева — файлы, которые используют этот. В центре — что в нём определено. Справа — что использует он. Нажмите на класс или функцию, чтобы оставить только её вызывающих и вызываемых.",
+    wholeFile: "Показать весь файл", project: "проект", folder: "Папка", anotherProject: "Открыть другой проект…", size: "Размер",
+    sizeLine: (p, f, s) => `${pl(p, "package")} · ${pl(f, "file")} · классов, функций и методов: ${s}`,
+    linksLine: (c, m, u) => `<span class="pill ok">подтверждённых</span>${c} · <span class="pill maybe">возможных</span>${m} · <span class="pill">неопределённых вызовов</span>${u}`,
+    designCheck: "Проверка архитектуры", allowedUsedN: (n) => `разрешено и используется: ${n}`, notAllowedCount: (n) => `не разрешено: ${n}`, unusedN: (n) => `не используется: ${n}`,
+    unreadable: (n) => `Файлы, которые карта не смогла прочитать (${n})`, startHere: "С чего начать",
+    startText: "Карточки — это пакеты вашего кода, разложенные по слоям: наверху то, с чего всё начинается (точки входа, сборка), внизу — фундамент. Нажмите на любую карточку, чтобы увидеть её связи. Клавиша <b>?</b> — короткая справка.",
+    fileKind: "файл", noMatch: "ничего не найдено", noData: "Нет данных карты.",
+  },
+};
+Object.assign(L.en, {
+  tourStart: "Take the 1-minute tour", tourNext: "Next", tourBack: "Back", tourDone: "Finish", tourClose: "Close",
+  toastText: "New here? A one-minute tour shows how to read the map.", toastLater: "Not now",
+  tour: {
+    welcome: { t: "Welcome to Method Project Map", b: "A one-minute tour of how to read the map of your code. Use → and ← or the buttons; Esc ends the tour." },
+    project: { t: "Your project", b: "This is the project on the map. Click its name to open another folder: pick it in Finder / Explorer, paste a path or choose a recent one." },
+    layers: { t: "Packages in layers", b: "Each card is a package, a folder of code. Code at the top uses code below it; the bottom layer is the foundation everything is built on." },
+    arrows: { t: "Links of one card", b: "We selected the most connected package. Blue arrows show what it uses, green arrows what uses it; the other cards fade. Double-click a card to go inside." },
+    tree: { t: "All files", b: "The same project as a list of folders, files, classes and functions. Click anything to jump to it." },
+    flow: { t: "Inside a file", b: "A file view: on the left who uses the file, in the middle its classes and functions, on the right what it uses." },
+    details: { t: "Details", b: "Everything about the selection: description, signature, links with line numbers. Buttons show just this function's code or the file in Finder / Explorer." },
+    crumbs: { t: "Where you are", b: "The way back up: overview › package › file. Esc does the same." },
+    search: { t: "Search", b: "Type the name of a class, function or file. Press / anywhere to jump here." },
+    maybe: { t: "Possible links", b: "By default the map shows only links proven from the code. Turn this on to also see likely ones (dashed) and check those in the code." },
+    design: { t: "Architecture", b: "This project has a design.yaml: switch to Architecture to see which dependencies the design allows and where the code breaks the rules." },
+    connect: { t: "Connect your AI", b: "Gives Claude Code / Codex a map of every Python project they open, so they read less code to find their way. One click to connect, one to disconnect." },
+    lang: { t: "Language", b: "Switch between English and Russian." },
+    help: { t: "Help is always here", b: "The full reference and this tour live behind this button. That's all — enjoy the map!" },
+  },
+  ref: [
+    { id: "what", t: "What this is", h: "<p>Method Project Map draws the structure of a Python project from its source code: packages, files, classes, functions and the links between them — who imports, calls or inherits whom. No AI is involved: the map is computed, so it is the same every time and refreshes itself when files change.</p><p>It answers questions like “where does this start?”, “what breaks if I change this file?”, “who calls this function?”.</p>" },
+    { id: "levels", t: "Three levels", h: "<p><b>Overview</b> — every card is a package (a folder of code). <b>Package</b> — every card is a file of that package. <b>File</b> — three columns: who uses the file, what is inside it, what it uses.</p><ul><li><b>Click</b> a card to select it and see its links.</li><li><b>Double-click</b> it or press <b>Open</b> to go inside.</li><li>The path at the top, <code>Esc</code> or <code>Backspace</code> take you one level up.</li><li>The <b>Files</b> tree on the left jumps straight to any package, file, class or function.</li></ul>" },
+    { id: "layers", t: "Layers", h: "<p>Cards are stacked by dependency. The <b>top layer</b> uses the layers below and nothing uses it: entry points, command line, tests. The <b>foundation</b> at the bottom depends on nothing in view: models, utilities, the core everything is built on. Layers in between build on the ones under them.</p><p>If code at the bottom suddenly uses code at the top, the design is usually worth a closer look.</p>" },
+    { id: "colors", t: "Arrows and colours", h: "<ul><li><span style='color:var(--uses)'>Blue</span> — what the selected item uses.</li><li><span style='color:var(--usedby)'>Green</span> — what uses the selected item.</li><li>A card with a <span style='color:var(--warn)'>red</span> frame both uses the selection and is used by it (a cycle).</li><li>Dashed amber — a possible link (see below).</li><li>In the Architecture view: green — allowed and used, red — not allowed, dotted — allowed but unused.</li></ul><p>Arrows are drawn only for the selected card, so the picture stays readable. Click an empty spot to clear the selection.</p>" },
+    { id: "trust", t: "Confirmed and possible links", h: "<ul><li><span class='pill ok'>confirmed</span> — proven from the code, for example a direct import or a call of an imported function. You can rely on it.</li><li><span class='pill maybe'>possible</span> — likely but not proven: a call through a typed parameter, a method a subclass may override, a variable assigned in several places. Hidden by default; turn on <b>Possible links</b> to see them.</li><li><b>Calls the map could not resolve</b> are listed in the side panel. The map says nothing about them: read the code.</li></ul><p>The map cannot see calls made from code outside the repository, functions replaced at run time (monkey-patching) or lookups by name with <code>getattr</code>.</p>" },
+    { id: "panel", t: "Side panel and search", h: "<p>The right panel describes the selection: what it is (from its docstring), its signature, what it contains, what it uses and who uses it, with line numbers. Buttons: <b>Open</b>, <b>Show source</b> (just that function or class, not the whole file) and <b>Show in Finder / Explorer</b>.</p><p><b>Search</b> (<code>/</code>) finds classes, functions, methods and files by name; <code>↑ ↓</code> choose a result, <code>Enter</code> opens it.</p>" },
+    { id: "projects", t: "Projects", h: "<p>Click the project name at the top left: choose a folder in Finder / Explorer, paste a full path, or pick a recent project. Any folder with Python files works; a home folder or a whole disk is refused.</p><p>To leave generated or third-party (vendored) code out of the map, put a <code>.pmapignore</code> file in the project root: one pattern per line, <code>folder/</code> skips a whole folder, <code>#</code> starts a comment.</p>" },
+    { id: "design", t: "Architecture (design.yaml)", h: "<p>Describe the intended architecture in <code>design.yaml</code> in the project root: the subsystems (which folders belong to each) and which subsystem may use which. The <b>Architecture</b> view then checks the real code against it and shows every forbidden dependency with the file and line it comes from.</p><pre class='src'>subsystems:\n  - id: ui\n    name: User interface\n    paths: ['app/ui/**']\n  - id: services\n    name: Business logic\n    paths: ['app/services/**']\n  - id: db\n    name: Database\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Here a call from <code>ui</code> straight into <code>db</code> shows up in red. In a terminal: <code>pmap check .</code>; add <code>--strict</code> to fail a CI job on violations.</p>" },
+    { id: "ai", t: "Connecting AI agents", h: "<p><b>Connect to AI</b> gives Claude Code and/or Codex access to project maps: a skill, a rule, the MCP tools and, for Claude Code, a hook that hands the agent a short overview of the project at the start of every session. In our tests the agent read half as much code with the same quality of fixes.</p><p>Only files in your home folder are changed, each with a backup; <b>Disconnect</b> removes everything again. In a terminal: <code>pmap connect --claude</code>, <code>--codex</code> or <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
+    { id: "launch", t: "Starting and stopping", h: "<ul><li>The <b>Method Project Map</b> shortcut (Applications on macOS, the Start menu on Windows, the app menu on Linux) or <code>pmap ui</code> opens the last project; the very first time it asks for a folder.</li><li>Starting it again opens the map that is already running.</li><li>The map stops by itself about 15 minutes after its tab is closed. If the page says “stopped”, start Method Project Map again.</li><li>The status at the top right: <b>live</b> — the map follows file changes; <b>static file</b> — a saved snapshot made by <code>pmap html</code>.</li></ul>" },
+    { id: "keys", t: "Keys", h: "<ul><li><code>/</code> — search</li><li><code>Esc</code>, <code>Backspace</code> — one level up, close a window</li><li><code>↑ ↓ Enter</code> — choose and open a search result</li><li>In the tour: <code>→</code> next, <code>←</code> back, <code>Esc</code> end</li></ul>" },
+    { id: "cli", t: "Command line", h: "<pre class='src'>pmap ui [folder]                open the map: the last project, or choose one\npmap html [folder] -o map.html  save the map as one self-contained page\npmap scan .                     save the map to .pmap/actual.json\npmap context .                  a short overview for an AI agent\npmap find NAME                  where a class or function is\npmap show REF                   one item: location, links, users\npmap source REF                 the code of one function or class\npmap check .                    compare the code with design.yaml\npmap stale .                    what changed since the last scan\npmap connect | disconnect       AI agents\npmap shortcut [--remove]        the Method Project Map app shortcut</pre>" },
+    { id: "trouble", t: "If something goes wrong", h: "<ul><li><b>“stopped — open Method Project Map again”</b> — the map stopped after its tab stayed closed or idle; start it again.</li><li><b>“No Python files”</b> — choose the project folder itself, not the folder above or next to it.</li><li><b>macOS asks for access to files</b> — allow it once: the shortcut needs to read the project folder, especially on an external disk.</li><li><b>A file is missing from the map</b> — look under “Files the map could not read” in the project panel (a syntax error) or check <code>.pmapignore</code>.</li><li><b>An expected link is missing</b> — turn on <b>Possible links</b>; calls through variables or <code>getattr</code> may stay unresolved.</li></ul>" },
+  ],
+});
+Object.assign(L.ru, {
+  tourStart: "Пройти обучение (1 минута)", tourNext: "Далее", tourBack: "Назад", tourDone: "Готово", tourClose: "Закрыть",
+  toastText: "Впервые здесь? Короткое обучение за минуту покажет, как читать карту.", toastLater: "Не сейчас",
+  tour: {
+    welcome: { t: "Добро пожаловать в Method Project Map", b: "Минутная экскурсия: как читать карту вашего кода. Листайте стрелками → и ← или кнопками; Esc завершает обучение." },
+    project: { t: "Ваш проект", b: "Это проект, который сейчас на карте. Нажмите на название, чтобы открыть другую папку: выбрать её в Finder / Проводнике, вставить путь или взять из недавних." },
+    layers: { t: "Пакеты по слоям", b: "Каждая карточка — пакет, то есть папка с кодом. Код сверху пользуется кодом снизу; нижний слой — фундамент, на котором построено всё остальное." },
+    arrows: { t: "Связи одной карточки", b: "Мы выбрали самый связанный пакет. Синие стрелки — что он использует, зелёные — кто использует его; остальные карточки бледнеют. Двойной клик по карточке открывает её." },
+    tree: { t: "Все файлы", b: "Тот же проект списком: папки, файлы, классы и функции. Нажмите на любой пункт, чтобы перейти к нему." },
+    flow: { t: "Внутри файла", b: "Вид файла: слева — кто его использует, в центре — его классы и функции, справа — что использует он." },
+    details: { t: "Подробности", b: "Всё о выбранном: описание, сигнатура, связи с номерами строк. Кнопки показывают код только этой функции или сам файл в Finder / Проводнике." },
+    crumbs: { t: "Где вы находитесь", b: "Путь назад: обзор › пакет › файл. Клавиша Esc делает то же самое." },
+    search: { t: "Поиск", b: "Введите имя класса, функции или файла. Клавиша / в любом месте переносит сюда." },
+    maybe: { t: "Возможные связи", b: "По умолчанию карта показывает только связи, доказанные по коду. Включите, чтобы видеть и вероятные (пунктиром), — их стоит проверить в коде." },
+    design: { t: "Архитектура", b: "У этого проекта есть design.yaml: переключитесь на «Архитектуру», чтобы увидеть, какие зависимости разрешены замыслом и где код нарушает правила." },
+    connect: { t: "Подключите ИИ", b: "Даёт Claude Code / Codex карту каждого Python-проекта, который они открывают, — чтобы им приходилось читать меньше кода. Подключается одним нажатием и так же отключается." },
+    lang: { t: "Язык", b: "Переключение между русским и английским." },
+    help: { t: "Справка всегда здесь", b: "Полный справочник и это обучение — за этой кнопкой. Вот и всё, приятной работы с картой!" },
+  },
+  ref: [
+    { id: "what", t: "Что это", h: "<p>Method Project Map рисует устройство Python-проекта по его исходному коду: пакеты, файлы, классы, функции и связи между ними — кто кого импортирует, вызывает, от кого наследуется. ИИ здесь не участвует: карта вычисляется, поэтому всегда одинакова и сама обновляется, когда меняются файлы.</p><p>Она отвечает на вопросы «откуда всё начинается?», «что сломается, если поменять этот файл?», «кто вызывает эту функцию?».</p>" },
+    { id: "levels", t: "Три уровня", h: "<p><b>Обзор</b> — каждая карточка это пакет (папка с кодом). <b>Пакет</b> — каждая карточка это файл пакета. <b>Файл</b> — три колонки: кто использует файл, что в нём, что использует он.</p><ul><li><b>Клик</b> по карточке выбирает её и показывает связи.</li><li><b>Двойной клик</b> или кнопка <b>Открыть</b> — зайти внутрь.</li><li>Путь вверху, <code>Esc</code> или <code>Backspace</code> — на уровень выше.</li><li>Дерево <b>Файлы</b> слева сразу открывает любой пакет, файл, класс или функцию.</li></ul>" },
+    { id: "layers", t: "Слои", h: "<p>Карточки разложены по зависимостям. <b>Верхний слой</b> пользуется слоями ниже, а его самого никто не использует: точки входа, командная строка, тесты. <b>Фундамент</b> внизу ни от чего на экране не зависит: модели, утилиты, ядро, на котором всё построено. Промежуточные слои опираются на те, что под ними.</p><p>Если код снизу вдруг пользуется кодом сверху, к архитектуре обычно стоит присмотреться.</p>" },
+    { id: "colors", t: "Стрелки и цвета", h: "<ul><li><span style='color:var(--uses)'>Синие</span> — что использует выбранное.</li><li><span style='color:var(--usedby)'>Зелёные</span> — кто использует выбранное.</li><li>Карточка в <span style='color:var(--warn)'>красной</span> рамке и использует выбранное, и используется им (цикл).</li><li>Жёлтый пунктир — возможная связь (см. ниже).</li><li>В виде «Архитектура»: зелёным — разрешено и используется, красным — не разрешено, точками — разрешено, но не используется.</li></ul><p>Стрелки рисуются только для выбранной карточки, чтобы картинка оставалась читаемой. Клик по пустому месту снимает выбор.</p>" },
+    { id: "trust", t: "Подтверждённые и возможные связи", h: "<ul><li><span class='pill ok'>подтверждена</span> — доказана по коду, например прямой импорт или вызов импортированной функции. На неё можно полагаться.</li><li><span class='pill maybe'>возможна</span> — вероятна, но не доказана: вызов через параметр с аннотацией типа, метод, который может переопределить подкласс, переменная, которой присваивают в нескольких местах. По умолчанию скрыты — включите <b>Возможные связи</b>.</li><li><b>Вызовы, которые карта не смогла определить</b>, перечислены в боковой панели. О них карта ничего не утверждает: смотрите код.</li></ul><p>Карта не видит вызовов из кода вне репозитория, подмены функций на лету (monkey-patching) и обращений по имени через <code>getattr</code>.</p>" },
+    { id: "panel", t: "Боковая панель и поиск", h: "<p>Правая панель описывает выбранное: что это (из docstring), сигнатура, что внутри, что оно использует и кто использует его — с номерами строк. Кнопки: <b>Открыть</b>, <b>Показать код</b> (только эта функция или класс, а не весь файл) и <b>Показать в Finder / Проводнике</b>.</p><p><b>Поиск</b> (<code>/</code>) находит классы, функции, методы и файлы по имени; <code>↑ ↓</code> — выбрать результат, <code>Enter</code> — открыть.</p>" },
+    { id: "projects", t: "Проекты", h: "<p>Нажмите на название проекта слева вверху: выберите папку в Finder / Проводнике, вставьте полный путь или возьмите проект из недавних. Подойдёт любая папка с Python-файлами; домашнюю папку или диск целиком карта не откроет.</p><p>Чтобы убрать с карты сгенерированный или чужой (вендорный) код, положите в корень проекта файл <code>.pmapignore</code>: по шаблону на строку, <code>папка/</code> исключает папку целиком, <code>#</code> начинает комментарий.</p>" },
+    { id: "design", t: "Архитектура (design.yaml)", h: "<p>Опишите задуманную архитектуру в файле <code>design.yaml</code> в корне проекта: подсистемы (какие папки к ним относятся) и какая подсистема может пользоваться какой. Вид <b>Архитектура</b> сверит с этим настоящий код и покажет каждую запрещённую зависимость вместе с файлом и строкой, откуда она взялась.</p><pre class='src'>subsystems:\n  - id: ui\n    name: Интерфейс\n    paths: ['app/ui/**']\n  - id: services\n    name: Бизнес-логика\n    paths: ['app/services/**']\n  - id: db\n    name: База данных\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Здесь вызов из <code>ui</code> напрямую в <code>db</code> будет показан красным. В терминале: <code>pmap check .</code>; с <code>--strict</code> проверка в CI упадёт при нарушениях.</p>" },
+    { id: "ai", t: "Подключение ИИ-агентов", h: "<p><b>Подключить к ИИ</b> даёт Claude Code и/или Codex доступ к картам проектов: навык, правило, MCP-инструменты, а для Claude Code ещё и хук, который в начале каждой сессии передаёт агенту краткий обзор проекта. В наших испытаниях агент читал вдвое меньше кода, а качество исправлений не изменилось.</p><p>Меняются только файлы в вашей домашней папке, у каждого есть резервная копия; <b>Отключить</b> убирает всё обратно. В терминале: <code>pmap connect --claude</code>, <code>--codex</code> или <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
+    { id: "launch", t: "Запуск и остановка", h: "<ul><li>Ярлык <b>Method Project Map</b> («Программы» на macOS, меню «Пуск» на Windows, меню приложений на Linux) или команда <code>pmap ui</code> открывает последний проект; в самый первый раз спросит папку.</li><li>Повторный запуск открывает уже работающую карту.</li><li>Карта сама останавливается примерно через 15 минут после того, как закрыли её вкладку. Если на странице написано «остановлена», просто запустите Method Project Map снова.</li><li>Статус справа вверху: <b>онлайн</b> — карта следит за изменениями файлов; <b>файл-снимок</b> — сохранённая копия, сделанная командой <code>pmap html</code>.</li></ul>" },
+    { id: "keys", t: "Клавиши", h: "<ul><li><code>/</code> — поиск</li><li><code>Esc</code>, <code>Backspace</code> — на уровень выше, закрыть окно</li><li><code>↑ ↓ Enter</code> — выбрать и открыть результат поиска</li><li>В обучении: <code>→</code> далее, <code>←</code> назад, <code>Esc</code> завершить</li></ul>" },
+    { id: "cli", t: "Командная строка", h: "<pre class='src'>pmap ui [папка]                 открыть карту: последний проект или выбрать\npmap html [папка] -o map.html   сохранить карту одной самодостаточной страницей\npmap scan .                     сохранить карту в .pmap/actual.json\npmap context .                  краткий обзор для ИИ-агента\npmap find ИМЯ                   где находится класс или функция\npmap show ССЫЛКА                один элемент: где, связи, кто использует\npmap source ССЫЛКА              код одной функции или класса\npmap check .                    сверить код с design.yaml\npmap stale .                    что изменилось после последнего скана\npmap connect | disconnect       ИИ-агенты\npmap shortcut [--remove]        ярлык Method Project Map</pre>" },
+    { id: "trouble", t: "Если что-то не так", h: "<ul><li><b>«остановлена — запустите Method Project Map снова»</b> — карта остановилась, потому что её вкладка была закрыта или долго не отвечала; запустите её снова.</li><li><b>«В папке нет Python-файлов»</b> — выберите саму папку проекта, а не ту, что выше или рядом.</li><li><b>macOS спрашивает доступ к файлам</b> — разрешите один раз: ярлыку нужно читать папку проекта, особенно на внешнем диске.</li><li><b>Файла нет на карте</b> — посмотрите раздел «Файлы, которые карта не смогла прочитать» в панели проекта (ошибка синтаксиса) или проверьте <code>.pmapignore</code>.</li><li><b>Нет ожидаемой связи</b> — включите <b>Возможные связи</b>; вызовы через переменные или <code>getattr</code> могут остаться неопределёнными.</li></ul>" },
+  ],
+});
+function t(key, ...args) { const v = key in L[LANG] ? L[LANG][key] : L.en[key]; return typeof v === "function" ? v(...args) : v; }
+const tp = (key) => t(key)[(PROJ && PROJ.platform) || "linux"];  // phrases that name Finder / Explorer
+
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-t]").forEach((el) => el.textContent = t(el.dataset.t));
+  document.querySelectorAll("[data-th]").forEach((el) => el.innerHTML = t(el.dataset.th));
+  document.querySelectorAll("[data-tp]").forEach((el) => el.placeholder = t(el.dataset.tp));
+  document.querySelectorAll("[data-tt]").forEach((el) => el.title = t(el.dataset.tt));
+  $("maybe").textContent = t("maybe", S.maybe);
+}
+
+// ======================================================================== index
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function trunc(s, n) { s = s || ""; return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+function buildIndex(data, withMaybe) {
+  const byId = new Map(), kids = new Map();
+  for (const n of data.nodes) byId.set(n.id, n);
+  for (const n of data.nodes) if (n.p) { if (!kids.has(n.p)) kids.set(n.p, []); kids.get(n.p).push(n); }
+  for (const l of kids.values()) l.sort((a, b) => (a.a || 0) - (b.a || 0));
+  const modOf = new Map();
+  for (const n of data.nodes) { let m = n; while (m && m.k !== "module") m = byId.get(m.p); modOf.set(n.id, m ? m.id : null); }
+  const pkgs = new Map();
+  for (const n of data.nodes) if (n.k === "module" && !n.x && n.g !== undefined) { if (!pkgs.has(n.g)) pkgs.set(n.g, []); pkgs.get(n.g).push(n.id); }
+  for (const l of pkgs.values()) l.sort((a, b) => byId.get(a).f.localeCompare(byId.get(b).f));
+  // the common top folder (e.g. "tallyhub/") is dropped from package labels
+  const counts = new Map();
+  for (const p of pkgs.keys()) { const f = p.split("/")[0]; counts.set(f, (counts.get(f) || 0) + 1); }
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const top = best && best[1] > pkgs.size / 2 && [...pkgs.keys()].some((p) => p.startsWith(best[0] + "/")) ? best[0] : null;
+  const pkgDoc = new Map();
+  for (const [p, mods] of pkgs) { const init = mods.map((m) => byId.get(m)).find((m) => m.f.endsWith("__init__.py")); if (init && init.d) pkgDoc.set(p, init.d); }
+  const pkgOf = (id) => { const m = byId.get(modOf.get(id)); return m && !m.x && m.g !== undefined ? m.g : null; };
+  // symbol-level links (confirmed, plus possible ones when asked)
+  const out = new Map(), inc = new Map();
+  for (const e of data.edges) {
+    if (e.c !== "r" && !withMaybe) continue;
+    for (const t of (e.m || [e.t])) {
+      const link = { s: e.s, t, k: e.k, c: e.m ? "i" : e.c, l: e.l, v: e.v, y: e.y };
+      if (!out.has(e.s)) out.set(e.s, []); out.get(e.s).push(link);
+      if (!inc.has(t)) inc.set(t, []); inc.get(t).push(link);
+    }
+  }
+  // module- and package-level aggregation (internal code only)
+  const modDeps = new Map(), modUsers = new Map(), pkgDeps = new Map(), pkgUsers = new Map();
+  const add = (map, a, b, link) => { if (!map.has(a)) map.set(a, new Map()); const m = map.get(a); if (!m.has(b)) m.set(b, []); m.get(b).push(link); };
+  for (const [s, links] of out) for (const link of links) {
+    const ms = modOf.get(s), mt = modOf.get(link.t); const ns = byId.get(ms), nt = byId.get(mt);
+    if (!ms || !mt || ms === mt || !ns || !nt || ns.x || nt.x) continue;
+    add(modDeps, ms, mt, link); add(modUsers, mt, ms, link);
+    const ps = ns.g, pt = nt.g;
+    if (ps !== pt && ps !== undefined && pt !== undefined && !link.y) { add(pkgDeps, ps, pt, link); add(pkgUsers, pt, ps, link); }
+  }
+  const membership = (data.design && data.design.membership) || {};
+  return { byId, kids, modOf, pkgs, top, pkgDoc, pkgOf, out, inc, modDeps, modUsers, pkgDeps, pkgUsers, membership };
+}
+
+function pkgLabel(p) {
+  if (IX.top && p === IX.top) return p + t("rootSuffix");
+  if (IX.top && p.startsWith(IX.top + "/")) return p.slice(IX.top.length + 1);
+  return p === "." ? t("topLevel") : p;
+}
+function modLabel(id) { const n = IX.byId.get(id); return n && n.f ? n.f.split("/").pop() : (n ? n.q : id); }
+function isEmptyInit(id) { const n = IX.byId.get(id); return n.f.endsWith("__init__.py") && !(IX.kids.get(id) || []).length && !IX.modDeps.has(id); }
+const size = (m) => (m ? m.size : 0);
+
+// layers: 0 = depends on nothing in the set; higher = builds on lower layers (cycles are cut)
+function layers(ids, depsOf) {
+  const set = new Set(ids), lvl = new Map(), seen = new Map();
+  const visit = (id) => {
+    if (lvl.has(id)) return lvl.get(id);
+    if (seen.get(id)) return 0;
+    seen.set(id, 1); let L = 0;
+    for (const d of depsOf(id)) if (d !== id && set.has(d)) L = Math.max(L, visit(d) + 1);
+    lvl.set(id, L); return L;
+  };
+  ids.forEach(visit);
+  const bands = [];
+  for (const id of ids) { const L = lvl.get(id); (bands[L] = bands[L] || []).push(id); }
+  return bands.map((b, i) => ({ level: i, ids: b || [] })).filter((b) => b.ids.length).reverse();
+}
+
+// ======================================================================== views
+
+function render() {
+  S.wires = [];
+  const s = S.scope;
+  if (s.type === "root") (S.view === "design" && DATA.design ? renderDesign : renderOverview)();
+  else if (s.type === "pkg") renderPackage(s.id);
+  else if (s.type === "sub") renderSubsystem(s.id);
+  else renderModule(s.id);
+  renderCrumbs(); renderTree(); renderDetails();
+  requestAnimationFrame(drawWires);
+}
+
+function card(id, title, desc, meta, extraCls) {
+  return `<div class="card ${extraCls || ""}" data-id="${esc(id)}"><div class="t">${esc(title)}</div>` +
+    (desc ? `<div class="d">${esc(desc)}</div>` : "") + (meta ? `<div class="m">${meta}</div>` : "") + `</div>`;
+}
+
+function bandTitle(i, total, level) {
+  if (total === 1) return t("all");
+  if (i === 0) return t("topLayer");
+  if (level === 0) return t("foundation");
+  return t("layer", level);
+}
+
+function renderBands(ids, depsOf, cardOf) {
+  const bands = layers(ids, depsOf);
+  return bands.map((b, i) => `<section class="band"><h4>${bandTitle(i, bands.length, b.level)}</h4><div class="cards">${b.ids.map(cardOf).join("")}</div></section>`).join("");
+}
+
+function renderOverview() {
+  const ids = [...IX.pkgs.keys()].sort();
+  const n = ids.length;
+  $("intro").innerHTML = t("overviewIntro", pl(n, "package")) +
+    `<span class="legend"><span><i style="border-color:var(--uses)"></i>${t("uses")}</span><span><i style="border-color:var(--usedby)"></i>${t("usedBy")}</span></span>`;
+  $("board").innerHTML = renderBands(ids, (p) => (IX.pkgDeps.get(p) || new Map()).keys(), (p) => {
+    const mods = IX.pkgs.get(p).filter((m) => !isEmptyInit(m));
+    const used = size(IX.pkgUsers.get(p)), uses = size(IX.pkgDeps.get(p));
+    const desc = IX.pkgDoc.get(p) || mods.slice(0, 4).map(modLabel).join(", ") + (mods.length > 4 ? "…" : "");
+    const tags = [];
+    if (used >= Math.max(3, n * 0.33)) tags.push(`<span class="tag">${t("widelyUsed")}</span>`);
+    if (!used && uses) tags.push(`<span class="tag">${t("entryPoint")}</span>`);
+    return card("pkg:" + p, pkgLabel(p), desc, `<span>${pl(mods.length, "file")}</span><span>${t("usesN", uses)}</span><span>${t("usedByN", used)}</span>${tags.join("")}`);
+  }) + wiresSvg();
+  bindCards(); selectWires();
+}
+
+function renderPackage(p) {
+  const mods = (IX.pkgs.get(p) || []).filter((m) => !isEmptyInit(m));
+  const chips = (map, label) => {
+    if (!map || !map.size) return "";
+    const items = [...map.entries()].sort((a, b) => b[1].length - a[1].length);
+    return `<div class="chips"><span class="lbl">${label}</span>${items.map(([q, l]) => `<span class="chip" data-pkg="${esc(q)}" title="${t("nLinks", l.length)}">${esc(pkgLabel(q))}</span>`).join("")}</div>`;
+  };
+  $("intro").innerHTML = t("pkgIntro", esc(pkgLabel(p)), esc((IX.pkgDoc.get(p) || pl(mods.length, "file")).replace(/\.$/, ""))) +
+    chips(IX.pkgDeps.get(p), t("usesPkgs")) + chips(IX.pkgUsers.get(p), t("usedByPkgs"));
+  $("board").innerHTML = (mods.length ? renderBands(mods, (m) => (IX.modDeps.get(m) || new Map()).keys(), (m) => moduleCard(m)) : `<div class="empty">${t("noFiles")}</div>`) + wiresSvg();
+  bindCards(); selectWires();
+}
+
+function moduleCard(m, extra) {
+  const n = IX.byId.get(m), names = (IX.kids.get(m) || []).filter((k) => !k.n.startsWith("_")).map((k) => k.n);
+  const meta = `<span>${pl(n.b, "line")}</span><span>${t("usesN", size(IX.modDeps.get(m)))}</span><span>${t("usedByN", size(IX.modUsers.get(m)))}</span>`;
+  const desc = n.d || (names.length ? names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") : "");
+  return card(m, modLabel(m), desc, meta, extra);
+}
+
+function renderSubsystem(sid) {
+  const mods = Object.entries(IX.membership).filter(([, s]) => s === sid).map(([m]) => m).filter((m) => IX.byId.has(m) && !isEmptyInit(m));
+  const spec = DATA.design.subsystems.find((x) => x.id === sid);
+  $("intro").innerHTML = t("subIntro", esc(spec ? spec.name : sid), esc(spec ? spec.paths.join(", ") : ""));
+  $("board").innerHTML = renderBands(mods, (m) => (IX.modDeps.get(m) || new Map()).keys(), (m) => moduleCard(m)) + wiresSvg();
+  bindCards(); selectWires();
+}
+
+function renderDesign() {
+  const d = DATA.design, ids = d.subsystems.map((x) => x.id);
+  const allowed = new Map(); d.allowed.forEach(([a, b]) => { if (!allowed.has(a)) allowed.set(a, []); allowed.get(a).push(b); });
+  $("intro").innerHTML = t("designIntro", d.convergences.length, d.divergences.length, d.absences.length) +
+    `<span class="legend"><span><i style="border-color:var(--usedby)"></i>${t("allowedUsed")}</span><span><i style="border-color:var(--warn)"></i>${t("notAllowed")}</span><span><i style="border-color:var(--muted);border-top-style:dotted"></i>${t("unused")}</span></span>`;
+  $("board").innerHTML = renderBands(ids, (s) => allowed.get(s) || [], (s) => {
+    const spec = d.subsystems.find((x) => x.id === s);
+    const files = Object.values(IX.membership).filter((x) => x === s).length;
+    const bad = d.divergences.filter((x) => x[0] === s || x[1] === s).length;
+    return card("sub:" + s, spec.name, spec.d || spec.paths.join(", "), `<span>${pl(files, "file")}</span>${bad ? `<span class="warn">${pl(bad, "violation")}</span>` : ""}`);
+  }) + wiresSvg();
+  bindCards();
+  designWires();
+}
+
+function designWires() {
+  const d = DATA.design;
+  for (const [a, b] of d.convergences) S.wires.push({ a: "sub:" + a, b: "sub:" + b, cls: "usedby", keep: true });
+  for (const [a, b, c] of d.divergences) S.wires.push({ a: "sub:" + a, b: "sub:" + b, cls: "warn", label: t("notAllowedN", c), keep: true });
+  for (const [a, b] of d.absences) S.wires.push({ a: "sub:" + a, b: "sub:" + b, cls: "unused", keep: true });
+}
+
+// ---------------------------------------------------------------- module flow
+
+function renderModule(m) {
+  const n = IX.byId.get(m);
+  const selSym = S.sel && IX.modOf.get(S.sel) === m && S.sel !== m ? S.sel : null;
+  const focus = selSym ? new Set([selSym, ...descendants(selSym)]) : null;
+  const inFocus = (id) => !focus || focus.has(id);
+  // who uses this module (or the selected symbol), grouped by their module
+  const users = new Map(), deps = new Map();
+  for (const sym of [m, ...descendants(m)]) {
+    for (const l of IX.inc.get(sym) || []) { const om = IX.modOf.get(l.s); if (om && om !== m && !(IX.byId.get(om) || {}).x) {
+      if (!users.has(om)) users.set(om, []); users.get(om).push({ link: l, here: sym, there: l.s, focus: inFocus(sym) }); } }
+    for (const l of IX.out.get(sym) || []) { const om = IX.modOf.get(l.t); if (om && om !== m) {
+      if (!deps.has(om)) deps.set(om, []); deps.get(om).push({ link: l, here: sym, there: l.t, focus: inFocus(sym) }); } }
+  }
+  const sideCards = (map, side) => {
+    const all = [...map.entries()].map(([om, ls]) => [om, ls, ls.some((x) => x.focus)]).sort((a, b) => (b[2] - a[2]) || b[1].length - a[1].length);
+    const libs = all.filter(([om]) => (IX.byId.get(om) || {}).x), entries = all.filter(([om]) => !(IX.byId.get(om) || {}).x);
+    const libCard = libs.length ? `<div class="card${libs.some((x) => x[2]) ? "" : " dim"}" data-side="${side}"><div class="t">${t("libraries", libs.length)}</div><div class="d">${esc(libs.map(([om]) => IX.byId.get(om).q).join(", "))}</div></div>` : "";
+    const shown = entries.slice(0, 40);
+    const html = shown.map(([om, ls, f]) => {
+      const node = IX.byId.get(om);
+      // which names of this file they use (left), or which names this file uses there (right); a bare import otherwise
+      const ids = ls.filter((x) => x.focus).map((x) => (side === "in" ? x.here : x.there));
+      const names = [...new Set(ids.filter((id) => (IX.byId.get(id) || {}).k !== "module").map(shortName))];
+      const via = names.length ? t("usesPrefix") + names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") : (side === "in" ? t("importsThisFile") : t("importsIt"));
+      const title = node.x ? node.q : modLabel(om);
+      const sub = node.x ? t("externalLib") : pkgLabel(node.g);
+      return `<div class="card${f ? "" : " dim"}" data-id="${esc(om)}" data-side="${side}"><div class="t">${esc(title)}</div><div class="d">${esc(sub)}</div>` +
+        (f ? `<div class="via">${esc(trunc(via, 90))}</div>` : "") + `</div>`;
+    }).join("");
+    return (html + (entries.length > shown.length ? `<div class="more">${t("more", entries.length - shown.length)}</div>` : "") + libCard) || `<div class="muted">${t("nothing")}</div>`;
+  };
+  const symbols = IX.kids.get(m) || [];
+  const symHtml = symbols.map((s) => {
+    const rows = (IX.kids.get(s.id) || []).map((k) => `<div class="row${S.sel === k.id ? " sel" : ""}" data-sym="${esc(k.id)}"><span>${esc(k.n)}</span><span>${linkCount(k.id)}</span></div>`).join("");
+    const dim = focus && !focus.has(s.id) && !(IX.kids.get(s.id) || []).some((k) => focus.has(k.id)) ? " dim" : "";
+    return `<div class="sym${dim}" data-id="${esc(s.id)}"><div class="hd${S.sel === s.id ? " sel" : ""}" data-sym="${esc(s.id)}"><div class="k">${t("kinds")[s.k] || s.k}</div><div class="n">${esc(s.n)}</div>` +
+      (s.s ? `<div class="s">${esc(trunc(s.s, 120))}</div>` : "") + `</div>${rows ? `<div class="rows">${rows}</div>` : ""}</div>`;
+  }).join("") || `<div class="muted">${t("noSymbols")}</div>`;
+  $("intro").innerHTML = t("modIntro", esc(modLabel(m)), esc(pkgLabel(n.g)), esc((n.d || t("noDescription")).replace(/\.$/, ""))) +
+    (selSym ? t("onlyLinksOf", esc(shortName(selSym))) : t("clickSymbol"));
+  const internalDeps = [...deps.keys()].filter((om) => !(IX.byId.get(om) || {}).x).length;
+  $("board").innerHTML = `<div class="flow"><div class="col"><h4>${t("colUsedBy", users.size)}</h4>${sideCards(users, "in")}</div>` +
+    `<div class="col"><h4>${t("colInside")}</h4>${symHtml}</div><div class="col"><h4>${t("colUses", internalDeps, deps.size > internalDeps)}</h4>${sideCards(deps, "out")}</div></div>` + wiresSvg();
+  const clear = $("clearSel"); if (clear) clear.onclick = () => { S.sel = null; render(); };
+  $("board").querySelectorAll("[data-sym]").forEach((el) => el.onclick = (e) => { e.stopPropagation(); S.sel = el.dataset.sym; render(); });
+  $("board").querySelectorAll(".card[data-id]").forEach((el) => {
+    el.onclick = (e) => { e.stopPropagation(); S.sel = el.dataset.id; renderDetails(); };
+    el.ondblclick = () => openNode(el.dataset.id);
+  });
+  if (selSym) {
+    const anchor = `[data-sym="${cssEsc(selSym)}"]`;
+    for (const [om, ls] of users) if (ls.some((x) => x.focus)) S.wires.push({ a: `.card[data-id="${cssEsc(om)}"][data-side="in"]`, b: anchor, cls: "usedby", raw: true });
+    for (const [om, ls] of deps) if (ls.some((x) => x.focus)) S.wires.push({ a: anchor, b: `.card[data-id="${cssEsc(om)}"][data-side="out"]`, cls: ls.some((x) => x.focus && x.link.c === "r") ? "uses" : "maybe", raw: true });
+  }
+}
+
+function linkCount(id) {
+  const a = (IX.inc.get(id) || []).length, b = (IX.out.get(id) || []).length;
+  return a || b ? t("inOut", a, b) : "";
+}
+function shortName(id) { const n = IX.byId.get(id); if (!n) return id; if (n.k === "module") return modLabel(id); const p = IX.byId.get(n.p); return p && p.k === "class" ? p.n + "." + n.n : n.n; }
+function descendants(id) { const out = []; const walk = (x) => (IX.kids.get(x) || []).forEach((c) => { out.push(c.id); walk(c.id); }); walk(id); return out; }
+function cssEsc(s) { return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/"/g, '\\"'); }
+
+// ======================================================================== wires
+
+function wiresSvg() { return `<svg id="wires"></svg>`; }
+
+function selectWires() {
+  const sel = S.sel; if (!sel) return;
+  const s = S.scope;
+  if (s.type === "root" && sel.startsWith("pkg:")) {
+    const p = sel.slice(4);
+    for (const q of (IX.pkgDeps.get(p) || new Map()).keys()) S.wires.push({ a: sel, b: "pkg:" + q, cls: "uses" });
+    for (const q of (IX.pkgUsers.get(p) || new Map()).keys()) S.wires.push({ a: "pkg:" + q, b: sel, cls: "usedby" });
+  } else if ((s.type === "pkg" || s.type === "sub") && IX.byId.has(sel)) {
+    for (const [q, ls] of IX.modDeps.get(sel) || new Map()) S.wires.push({ a: sel, b: q, cls: ls.some((l) => l.c === "r") ? "uses" : "maybe" });
+    for (const [q, ls] of IX.modUsers.get(sel) || new Map()) S.wires.push({ a: q, b: sel, cls: ls.some((l) => l.c === "r") ? "usedby" : "maybe" });
+  }
+}
+
+function markSelected() {
+  if (S.scope.type === "module") return;
+  const board = $("board"), related = new Map(), sel = S.sel;
+  const role = (w) => (w.cls === "usedby" ? "usedby" : "uses");
+  for (const w of S.wires) {
+    if (w.keep) continue;
+    const other = w.a === sel ? w.b : w.a, r = w.a === sel ? "uses" : "usedby";
+    related.set(other, related.has(other) && related.get(other) !== r ? "both" : r);
+  }
+  const focusMode = sel && related.size;
+  board.querySelectorAll(".card[data-id]").forEach((c) => {
+    const id = c.dataset.id;
+    c.classList.toggle("sel", id === sel);
+    c.classList.remove("uses", "usedby", "both", "dim");
+    if (focusMode && id !== sel) { const r = related.get(id); if (r) c.classList.add(r); else c.classList.add("dim"); }
+  });
+}
+
+function drawWires() {
+  const svg = $("wires"); if (!svg) return;
+  markSelected();
+  const board = $("board"), box = board.getBoundingClientRect();
+  svg.setAttribute("width", board.scrollWidth); svg.setAttribute("height", board.scrollHeight);
+  const color = { uses: "uses", usedby: "usedby", warn: "warn", maybe: "maybe", unused: "muted" };
+  svg.innerHTML = "<defs>" + Object.keys(color).map((c) =>
+    `<marker id="ar-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--${color[c]})"/></marker>`).join("") + "</defs>";
+  const find = (key, raw) => raw ? board.querySelector(key) : board.querySelector(`.card[data-id="${cssEsc(key)}"]`);
+  const rel = (r) => ({ left: r.left - box.left, right: r.right - box.left, top: r.top - box.top, bottom: r.bottom - box.top,
+    cx: r.left - box.left + r.width / 2, cy: r.top - box.top + r.height / 2, w: r.width, h: r.height });
+  const resolved = S.wires.map((w) => { const a = find(w.a, w.raw), b = find(w.b, w.raw); return a && b && a !== b ? { w, a: rel(a.getBoundingClientRect()), b: rel(b.getBoundingClientRect()), ea: a, eb: b } : null; }).filter(Boolean);
+  const cardRects = [...board.querySelectorAll(".card,.sym")].map((c) => [c, rel(c.getBoundingClientRect())]);
+  // spread several wires that leave or enter the same card across its width
+  const slots = new Map();
+  const slot = (el, key) => { const list = slots.get(el) || []; if (!list.includes(key)) list.push(key); slots.set(el, list); };
+  resolved.forEach((r, i) => { slot(r.ea, i + "a"); slot(r.eb, i + "b"); });
+  const spread = (el, key, rect) => { const list = slots.get(el); const k = list.indexOf(key); return rect.left + rect.w * (k + 1) / (list.length + 1); };
+  const blocked = (r) => cardRects.some(([el, c]) => el !== r.ea && el !== r.eb && c.right > Math.min(r.a.cx, r.b.cx) - 4 && c.left < Math.max(r.a.cx, r.b.cx) + 4
+    && c.top > Math.min(r.a.bottom, r.b.bottom) - 2 && c.bottom < Math.max(r.a.top, r.b.top) + 2);
+  let lane = 0;
+  const maxRight = Math.max(0, ...cardRects.map(([, c]) => c.right));
+  resolved.forEach((r, i) => {
+    const { w, a, b } = r;
+    let d, lx, ly;
+    const stacked = Math.abs(b.cy - a.cy) > Math.abs(b.cx - a.cx) * 0.6;
+    if (stacked && blocked(r)) {                         // a card is in the way: go round it through a side lane
+      const x = Math.max(a.right, b.right, w.raw ? 0 : maxRight) + 22 + 16 * lane++;
+      d = `M${a.right},${a.cy} C${x},${a.cy} ${x},${a.cy} ${x},${a.cy + 14} L${x},${b.cy - 14} C${x},${b.cy} ${x},${b.cy} ${b.right},${b.cy}`;
+      lx = x; ly = (a.cy + b.cy) / 2;
+    } else if (stacked) {                                 // neighbouring layers: leave from the bottom/top edges
+      const down = b.cy > a.cy, x1 = spread(r.ea, i + "a", a), x2 = spread(r.eb, i + "b", b);
+      const y1 = down ? a.bottom : a.top, y2 = down ? b.top : b.bottom, my = (y1 + y2) / 2;
+      d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; lx = (x1 + x2) / 2; ly = my;
+    } else {                                              // side by side: leave from the left/right edges
+      const right = b.cx > a.cx, x1 = right ? a.right : a.left, x2 = right ? b.left : b.right, mx = (x1 + x2) / 2;
+      d = `M${x1},${a.cy} C${mx},${a.cy} ${mx},${b.cy} ${x2},${b.cy}`; lx = mx; ly = (a.cy + b.cy) / 2;
+    }
+    const path = document.createElementNS(SVGNS, "path");
+    path.setAttribute("d", d); path.setAttribute("class", w.cls); path.setAttribute("marker-end", `url(#ar-${w.cls})`);
+    svg.appendChild(path);
+    if (w.label) { const t = document.createElementNS(SVGNS, "text"); t.setAttribute("x", lx + 6); t.setAttribute("y", ly); t.textContent = w.label; svg.appendChild(t); }
+  });
+  svg.setAttribute("width", Math.max(board.scrollWidth, maxRight + 40 + 16 * lane + 140));
+}
+
+// ======================================================================== interaction
+
+function bindCards() {
+  $("board").querySelectorAll(".card[data-id]").forEach((el) => {
+    el.onclick = (e) => { e.stopPropagation(); select(el.dataset.id); };
+    el.ondblclick = (e) => { e.stopPropagation(); openNode(el.dataset.id); };
+  });
+  $("intro").querySelectorAll("[data-pkg]").forEach((el) => el.onclick = () => go({ type: "pkg", id: el.dataset.pkg }));
+}
+
+function select(id) {
+  S.sel = id;
+  S.wires = S.wires.filter((w) => w.keep);
+  selectWires(); renderDetails(); renderTree(); requestAnimationFrame(drawWires);
+}
+
+function go(scope, sel) { S.scope = scope; S.sel = sel || null; $("stage").scrollTop = 0; render(); }
+
+function openNode(id) {
+  if (id.startsWith("pkg:")) return go({ type: "pkg", id: id.slice(4) });
+  if (id.startsWith("sub:")) return go({ type: "sub", id: id.slice(4) });
+  const n = IX.byId.get(id); if (!n || n.x) return;
+  if (n.k === "module") return go({ type: "module", id });
+  go({ type: "module", id: IX.modOf.get(id) }, id);
+}
+
+function reveal(id) {
+  const n = IX.byId.get(id); if (!n || n.x) return;
+  if (n.k === "module") return go({ type: "module", id });
+  go({ type: "module", id: IX.modOf.get(id) }, id);
+}
+
+function up() {
+  const s = S.scope;
+  if (s.type === "module") { const n = IX.byId.get(s.id); go(S.view === "design" && IX.membership[s.id] ? { type: "sub", id: IX.membership[s.id] } : { type: "pkg", id: n.g }, s.id); }
+  else if (s.type !== "root") go({ type: "root" }, s.type === "pkg" ? "pkg:" + s.id : "sub:" + s.id);
+}
+
+// ======================================================================== chrome
+
+function renderCrumbs() {
+  const c = $("crumbs"); c.innerHTML = "";
+  const s = S.scope, chain = [{ type: "root" }];
+  if (s.type === "pkg" || s.type === "sub") chain.push(s);
+  if (s.type === "module") { const n = IX.byId.get(s.id); chain.push(S.view === "design" && IX.membership[s.id] ? { type: "sub", id: IX.membership[s.id] } : { type: "pkg", id: n.g }); chain.push(s); }
+  const title = (sc) => sc.type === "root" ? (S.view === "design" && DATA.design ? t("crumbDesign") : t("crumbAll")) : sc.type === "pkg" ? pkgLabel(sc.id) : sc.type === "sub" ? sc.id : modLabel(sc.id);
+  chain.forEach((sc, i) => {
+    if (i) { const sp = document.createElement("span"); sp.className = "sep"; sp.textContent = "›"; c.appendChild(sp); }
+    const b = document.createElement("button"); b.textContent = title(sc);
+    if (i === chain.length - 1) b.className = "current"; else b.onclick = () => go(sc);
+    c.appendChild(b);
+  });
+}
+
+function renderTree() {
+  const root = $("tree"); root.innerHTML = `<div class="ttl">${t("files")}</div>`;
+  const add = (d, label, id, toggle, title) => {
+    const el = document.createElement("div"); el.className = "tn" + (S.sel === id || (S.scope.type === "module" && S.scope.id === id && !S.sel) ? " sel" : "");
+    el.style.setProperty("--d", d); el.title = title || label;
+    el.innerHTML = `<span class="tw">${toggle === undefined ? "" : S.open.has(toggle) ? "▾" : "▸"}</span>${esc(label)}`;
+    root.appendChild(el); return el;
+  };
+  const s = S.scope;
+  if (s.type === "pkg") S.open.add("pkg:" + s.id);
+  if (s.type === "module") { S.open.add("pkg:" + IX.byId.get(s.id).g); S.open.add(s.id); }
+  for (const p of [...IX.pkgs.keys()].sort()) {
+    const key = "pkg:" + p, el = add(0, pkgLabel(p) + "/", key, key, IX.pkgDoc.get(p));
+    el.onclick = () => { if (S.open.has(key) && s.type === "pkg" && s.id === p) { S.open.delete(key); renderTree(); return; } S.open.add(key); go({ type: "pkg", id: p }); };
+    if (!S.open.has(key)) continue;
+    for (const m of IX.pkgs.get(p)) {
+      if (isEmptyInit(m)) continue;
+      const kids = IX.kids.get(m) || [];
+      const me = add(1, modLabel(m), m, kids.length ? m : undefined, IX.byId.get(m).d);
+      me.onclick = () => { if (S.open.has(m) && s.type === "module" && s.id === m) { S.open.delete(m); renderTree(); return; } S.open.add(m); go({ type: "module", id: m }); };
+      if (!S.open.has(m)) continue;
+      for (const k of kids) { const ke = add(2, (k.k === "class" ? "◆ " : "ƒ ") + k.n, k.id, undefined, k.q); ke.onclick = () => reveal(k.id); }
+    }
+  }
+}
+
+function linkLabel(c, v) {
+  if (v) return `<span class="pill warn" title="${t("notAllowedTitle")}">${t("notAllowed")}</span>`;
+  return c === "r" ? `<span class="pill ok" title="${t("confirmedTitle")}">${t("confirmed")}</span>` : `<span class="pill maybe" title="${t("possibleTitle")}">${t("possible")}</span>`;
+}
+function nodeLink(id) { const n = IX.byId.get(id); const label = n ? (n.k === "module" ? (n.f || n.q) : n.q) : id; return n && !n.x ? `<a data-goto="${esc(id)}">${esc(label)}</a>` : `<span class="muted">${esc(label)} ${t("library")}</span>`; }
+function linkList(list, side) {
+  if (!list || !list.length) return `<div class="muted">${t("nothing")}</div>`;
+  const rows = new Map();
+  for (const l of list) { const other = side === "out" ? l.t : l.s, key = other + l.k + l.c; const r = rows.get(key) || { other, l, lines: [] }; if (l.l) r.lines.push(l.l); rows.set(key, r); }
+  return [...rows.values()].slice(0, 60).map(({ other, l, lines }) => `<div>${linkLabel(l.c, l.v)}<span class="pill">${t("linkKinds")[l.k] || l.k}</span>${nodeLink(other)}${lines.length ? ` <span class="ln">${t("lineN", [...new Set(lines)].slice(0, 5).join(", "))}</span>` : ""}</div>`).join("") +
+    (rows.size > 60 ? `<div class="muted">${t("more", rows.size - 60)}</div>` : "");
+}
+
+function renderDetails() {
+  const box = $("details"), id = S.sel;
+  if (!id) { box.innerHTML = S.scope.type === "root" ? overview() : scopeSummary(); bindLinks(box); return; }
+  if (id.startsWith("pkg:")) { box.innerHTML = packageDetails(id.slice(4)); bindLinks(box); return; }
+  if (id.startsWith("sub:")) { box.innerHTML = subsystemDetails(id.slice(4)); bindLinks(box); return; }
+  const n = IX.byId.get(id); if (!n) { box.innerHTML = ""; return; }
+  if (n.x) { box.innerHTML = `<div class="kind">${t("externalLib")}</div><h2>${esc(n.q)}</h2><div class="muted">${t("externalText")}</div>`; return; }
+  const kids = IX.kids.get(id) || [];
+  const kindName = t("kinds")[n.k] || n.k;
+  let h = `<div class="kind">${kindName}</div><h2>${esc(n.k === "module" ? modLabel(id) : n.n)}</h2><div class="path">${esc(n.f)}:${n.a}–${n.b}</div>`;
+  if (n.d) h += `<h3>${t("whatItIs")}</h3><div>${esc(n.d)}</div>`;
+  if (n.s) h += `<h3>${t("signature")}</h3><div class="sig">${esc(n.n + n.s)}</div>`;
+  const parent = IX.byId.get(n.p);
+  if (parent && parent.k === "class") h += `<h3>${t("partOf")}</h3><div class="list"><div>${nodeLink(parent.id)}</div></div>`;
+  if (kids.length) h += `<h3>${t("contains", kids.length)}</h3><div class="list">${kids.slice(0, 80).map((k) => `<div>${k.k === "class" ? "◆" : "ƒ"} ${nodeLink(k.id)} <span class="ln">${t("lineN", k.a)}</span></div>`).join("")}</div>`;
+  h += `<h3>${t("usesH")}</h3><div class="list">${linkList(IX.out.get(id), "out")}</div><h3>${t("usedByH")}</h3><div class="list">${linkList(IX.inc.get(id), "in")}</div>`;
+  if (n.uc) h += `<h3>${t("unresolvedCalls", n.uc)}</h3><div class="path">${esc(n.u.join(", "))}${n.uc > n.u.length ? " …" : ""}</div>`;
+  const canOpen = !(S.scope.type === "module" && (S.scope.id === id || IX.modOf.get(id) === S.scope.id));
+  const actions = (canOpen ? `<button class="btn primary" id="openBtn">${t("open")}</button>` : "") +
+    (LIVE ? `<button class="btn" id="srcBtn">${t("showSource")}</button><button class="btn" data-reveal-id="${esc(id)}">${esc(tp("showIn"))}</button>` : "");
+  if (actions) h += `<h3>${t("actions")}</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${actions}</div><div id="src"></div>`;
+  box.innerHTML = h; bindLinks(box);
+  const ob = $("openBtn"); if (ob) ob.onclick = () => openNode(id);
+  const sb = $("srcBtn"); if (sb) sb.onclick = async () => {
+    sb.disabled = true;
+    try { const j = await (await fetch("api/source?id=" + encodeURIComponent(id))).json(); $("src").innerHTML = `<pre class="src">${esc(j.text || j.error)}</pre>`; }
+    catch (err) { $("src").textContent = String(err); }
+  };
+}
+
+function packageDetails(p) {
+  const mods = (IX.pkgs.get(p) || []).filter((m) => !isEmptyInit(m));
+  const rows = (map) => map && map.size ? [...map.entries()].sort((a, b) => b[1].length - a[1].length).map(([q, l]) => `<div><a data-pkg="${esc(q)}">${esc(pkgLabel(q))}</a> <span class="ln">${t("nLinks", l.length)}</span></div>`).join("") : `<div class="muted">${t("nothing")}</div>`;
+  const openable = !(S.scope.type === "pkg" && S.scope.id === p);
+  const actions = (openable ? `<button class="btn primary" data-open="pkg:${esc(p)}">${t("openPackage")}</button>` : "") +
+    (LIVE ? `<button class="btn" data-reveal-path="${esc(p)}">${esc(tp("showIn"))}</button>` : "");
+  return `<div class="kind">${t("package")}</div><h2>${esc(pkgLabel(p))}</h2><div class="path">${esc(p)}/</div>` + (IX.pkgDoc.get(p) ? `<h3>${t("whatItIs")}</h3><div>${esc(IX.pkgDoc.get(p))}</div>` : "") +
+    (actions ? `<h3>${t("actions")}</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${actions}</div>` : "") +
+    `<h3>${t("filesN", mods.length)}</h3><div class="list">${mods.map((m) => `<div>${nodeLink(m)}<div class="muted">${esc(trunc(IX.byId.get(m).d || "", 90))}</div></div>`).join("")}</div>` +
+    `<h3>${t("usesPackagesH")}</h3><div class="list">${rows(IX.pkgDeps.get(p))}</div><h3>${t("usedByPackagesH")}</h3><div class="list">${rows(IX.pkgUsers.get(p))}</div>`;
+}
+
+function subsystemDetails(sid) {
+  const d = DATA.design, spec = d.subsystems.find((x) => x.id === sid);
+  const rel = (arr, label, cls) => arr.filter((x) => x[0] === sid || x[1] === sid).map((x) => `<div><span class="pill ${cls}">${label}</span>${esc(x[0])} → ${esc(x[1])}${x[2] !== undefined ? ` <span class="ln">${t("nLinks", x[2])}</span>` : ""}</div>`).join("");
+  const openable = !(S.scope.type === "sub" && S.scope.id === sid);
+  return `<div class="kind">${t("subsystem")}</div><h2>${esc(spec.name)}</h2><div class="path">${esc(spec.paths.join(", "))}</div>` + (spec.d ? `<h3>${t("whatItIs")}</h3><div>${esc(spec.d)}</div>` : "") +
+    (openable ? `<h3>${t("actions")}</h3><button class="btn primary" data-open="sub:${esc(sid)}">${t("openSubsystem")}</button>` : "") +
+    `<h3>${t("relations")}</h3><div class="list">${rel(d.divergences, t("notAllowed"), "warn") + rel(d.convergences, t("allowedUsed"), "ok") + rel(d.absences, t("allowedUnused"), "") || `<div class="muted">${t("none")}</div>`}</div>`;
+}
+
+function scopeSummary() {
+  const s = S.scope;
+  if (s.type === "pkg") return packageDetails(s.id);
+  if (s.type === "sub") return subsystemDetails(s.id);
+  const n = IX.byId.get(s.id);
+  return `<div class="kind">${t("kinds").module}</div><h2>${esc(modLabel(s.id))}</h2><div class="path">${esc(n.f)}</div>` + (n.d ? `<h3>${t("whatItIs")}</h3><div>${esc(n.d)}</div>` : "") +
+    `<h3>${t("howToRead")}</h3><div class="muted">${t("howToReadText")}</div>` +
+    (LIVE ? `<h3>${t("actions")}</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="srcBtn2">${t("wholeFile")}</button><button class="btn" data-reveal-id="${esc(s.id)}">${esc(tp("showIn"))}</button></div><div id="src"></div>` : "");
+}
+
+function overview() {
+  const internal = DATA.nodes.filter((n) => !n.x), mods = internal.filter((n) => n.k === "module");
+  const conf = DATA.edges.filter((e) => e.c === "r").length, maybe = DATA.edges.length - conf, unres = internal.reduce((s, n) => s + (n.uc || 0), 0);
+  let h = `<div class="kind">${t("project")}</div><h2>${esc(DATA.project)}</h2><div class="muted">${esc(t("scanned", DATA.generated_at))}</div>`;
+  if (LIVE && PROJ) h += `<h3>${t("folder")}</h3><div class="path">${esc(PROJ.path)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">` +
+    `<button class="btn" data-reveal-path="">${esc(tp("showIn"))}</button><button class="btn" data-projects>${t("anotherProject")}</button></div>`;
+  h += `<h3>${t("size")}</h3><div class="list"><div>${t("sizeLine", IX.pkgs.size, mods.length, internal.length - mods.length)}</div>` +
+    `<div>${t("linksLine", conf, maybe, unres)}</div></div>`;
+  if (DATA.design) { const d = DATA.design;
+    h += `<h3>${t("designCheck")}</h3><div class="list"><div><span class="pill ok">${t("allowedUsedN", d.convergences.length)}</span><span class="pill warn">${t("notAllowedCount", d.divergences.length)}</span><span class="pill">${t("unusedN", d.absences.length)}</span></div>` +
+      d.divergences.map((x) => `<div class="warn">${esc(x[0])} → ${esc(x[1])} (${t("nLinks", x[2])})</div>`).join("") + d.warnings.map((w) => `<div class="muted">${esc(w)}</div>`).join("") + "</div>"; }
+  if (DATA.errors.length) h += `<h3 class="warn">${t("unreadable", DATA.errors.length)}</h3><div class="list">${DATA.errors.map((e) => `<div class="path">${esc(e.path)} — ${esc(e.kind)}</div>`).join("")}</div>`;
+  h += `<h3>${t("startHere")}</h3><div class="muted">${t("startText")}</div>`;
+  return h;
+}
+
+function bindLinks(box) {
+  box.querySelectorAll("a[data-goto]").forEach((a) => a.onclick = () => reveal(a.dataset.goto));
+  box.querySelectorAll("a[data-pkg]").forEach((a) => a.onclick = () => go({ type: "pkg", id: a.dataset.pkg }));
+  box.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openNode(b.dataset.open));
+  box.querySelectorAll("[data-reveal-id]").forEach((b) => b.onclick = () => revealInFiles({ id: b.dataset.revealId }));
+  box.querySelectorAll("[data-reveal-path]").forEach((b) => b.onclick = () => revealInFiles({ path: b.dataset.revealPath }));
+  box.querySelectorAll("[data-projects]").forEach((b) => b.onclick = openProjects);
+  const whole = $("srcBtn2");
+  if (whole) whole.onclick = async () => {
+    whole.disabled = true;
+    const j = await (await fetch("api/source?id=" + encodeURIComponent(S.scope.id))).json();
+    $("src").innerHTML = `<pre class="src">${esc(j.text || j.error)}</pre>`;
+  };
+}
+
+// ======================================================================== search
+
+let hits = [], active = 0;
+function search(q) {
+  q = q.trim().toLowerCase(); const box = $("results");
+  if (!q) { box.style.display = "none"; return; }
+  const scored = [];
+  for (const n of DATA.nodes) {
+    if (n.x) continue;
+    const name = n.n.toLowerCase(), qn = n.q.toLowerCase(), f = (n.f || "").toLowerCase();
+    const s = name === q ? 0 : name.startsWith(q) ? 1 : qn.endsWith("." + q) ? 2 : name.includes(q) ? 3 : (n.k === "module" && f.includes(q)) ? 4 : qn.includes(q) ? 5 : -1;
+    if (s >= 0) scored.push([s, n.q.length, n]);
+  }
+  scored.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  hits = scored.slice(0, 40).map((x) => x[2]); active = 0;
+  box.innerHTML = hits.length ? hits.map((n, i) => `<div data-i="${i}" class="${i ? "" : "active"}"><span class="pill">${n.k === "module" ? t("fileKind") : (t("kinds")[n.k] || n.k)}</span>${esc(n.k === "module" ? n.f : shortName(n.id))}<br><span class="path">${esc(n.f)}:${n.a}</span></div>`).join("") : `<div class="muted">${t("noMatch")}</div>`;
+  box.style.display = "block";
+  box.querySelectorAll("div[data-i]").forEach((d) => d.onmousedown = () => choose(+d.dataset.i));
+}
+function choose(i) { const n = hits[i]; if (!n) return; $("results").style.display = "none"; $("search").value = ""; $("search").blur(); reveal(n.id); }
+
+// ======================================================================== mermaid
+
+function mermaid() {
+  const board = $("board"), ids = new Map(); let k = 0;
+  const label = (id) => id.startsWith("pkg:") ? pkgLabel(id.slice(4)) : id.startsWith("sub:") ? id.slice(4) : (IX.byId.get(id) ? (IX.byId.get(id).k === "module" ? modLabel(id) : shortName(id)) : id);
+  const nid = (id) => { if (!ids.has(id)) ids.set(id, "n" + (k++)); return ids.get(id); };
+  const cards = [...new Set([...board.querySelectorAll(".card[data-id]")].map((c) => c.dataset.id))], set = new Set(cards), pairs = [];
+  const s = S.scope;
+  if (s.type === "root" && S.view === "design" && DATA.design) {
+    DATA.design.convergences.forEach(([a, b]) => pairs.push(["sub:" + a, "sub:" + b, "-->"]));
+    DATA.design.divergences.forEach(([a, b]) => pairs.push(["sub:" + a, "sub:" + b, "==>|not allowed|"]));
+  } else if (s.type === "root") { for (const p of IX.pkgs.keys()) for (const q of (IX.pkgDeps.get(p) || new Map()).keys()) pairs.push(["pkg:" + p, "pkg:" + q, "-->"]); }
+  else if (s.type === "pkg" || s.type === "sub") { for (const m of set) for (const q of (IX.modDeps.get(m) || new Map()).keys()) if (set.has(q)) pairs.push([m, q, "-->"]); }
+  else { const m = s.id; set.add(m); for (const q of (IX.modDeps.get(m) || new Map()).keys()) pairs.push([m, q, "-->"]); for (const q of (IX.modUsers.get(m) || new Map()).keys()) pairs.push([q, m, "-->"]); }
+  const lines = ["flowchart TD"], edges = [];
+  for (const [a, b, arrow] of pairs) if (set.has(a) || set.has(b)) edges.push(`    ${nid(a)} ${arrow} ${nid(b)}`);
+  for (const id of set) nid(id);
+  for (const [id, n] of ids) lines.push(`    ${n}["${label(id).replace(/"/g, "'")}"]`);
+  return lines.concat(edges).join("\n") + "\n";
+}
+
+// ======================================================================== connect (live mode)
+
+async function api(path, body) {
+  const opts = body ? { method: "POST", headers: { "Content-Type": "application/json", "X-Pmap-Token": TOKEN }, body: JSON.stringify(body) } : { cache: "no-store" };
+  const r = await fetch(path, opts); return r.json();
+}
+async function refreshConnection() {
+  try {
+    const st = await api("api/connection");
+    const fmt = (x) => x.connected ? `<b style="color:var(--usedby)">${t("isConnected")}</b>` : t("notConnected");
+    $("connState").innerHTML = t("connState", fmt(st.claude), fmt(st.codex));
+    const on = st.claude.connected || st.codex.connected;
+    $("connectBtn").dataset.t = on ? "connected" : "connect"; $("connectBtn").textContent = t($("connectBtn").dataset.t);
+  } catch (err) { $("connState").textContent = t("noServer"); }
+}
+async function connect(action) {
+  $("connRes").style.display = "block"; $("connRes").textContent = t("working");
+  try {
+    const res = await api("api/" + action, { claude: $("cClaude").checked, codex: $("cCodex").checked });
+    $("connRes").textContent = (res.report || []).join("\n") || res.error || t("done");
+  } catch (err) { $("connRes").textContent = String(err); }
+  refreshConnection();
+}
+
+// ======================================================================== projects (live mode)
+
+async function loadProject() { try { PROJ = await api("api/project"); } catch (err) { PROJ = null; } }
+
+function openProjects() {
+  if (!LIVE) { alert(t("projStatic")); return; }
+  $("projRes").style.display = "none"; renderProjects(); show("projectModal");
+  loadProject().then(renderProjects);
+}
+
+function renderProjects() {
+  if (!PROJ) return;
+  $("projPath").textContent = PROJ.path;
+  $("projReveal").textContent = tp("showIn");
+  $("projPick").textContent = t("projPick");
+  $("projPick").style.display = PROJ.can_pick ? "" : "none";
+  $("projPickHint").textContent = PROJ.can_pick ? tp("projPickHint") : "";
+  const others = PROJ.recent.filter((p) => p !== PROJ.path);
+  $("projRecent").innerHTML = others.length ? others.map((p) => `<div><a data-proj="${esc(p)}">${esc(p.split(/[\\/]/).filter(Boolean).pop() || p)}</a><div class="path">${esc(p)}</div></div>`).join("")
+    : `<div class="muted">${t("projNone")}</div>`;
+  $("projRecent").querySelectorAll("a[data-proj]").forEach((a) => a.onclick = () => switchProject(a.dataset.proj));
+}
+
+function projMessage(text, isError) { const r = $("projRes"); r.style.display = "block"; r.classList.toggle("err", !!isError); r.textContent = text; }
+
+async function switchProject(path, pick) {
+  projMessage(pick ? tp("projWaiting") : t("projScanning"));
+  try {
+    const j = pick ? await api("api/pick", { prompt: t("projPrompt") }) : await api("api/open", { path });
+    if (j.cancelled) { projMessage(t("projCancelled")); return; }
+    if (j.error) { const key = "err_" + j.code; projMessage(key in L.en ? t(key, j.path) : j.error, true); return; }
+    projMessage(t("projScanning"));
+    const data = await api("api/graph");
+    if (!data.nodes) { projMessage(data.error || t("noData"), true); return; }
+    S.scope = { type: "root" }; S.sel = null; S.open.clear(); S.view = "pkg"; $("view").value = "pkg";
+    await loadProject();
+    S.version = data.version; load(data); render();
+    $("projInput").value = ""; $("projectModal").style.display = "none";
+  } catch (err) { projMessage(String(err), true); }
+}
+
+async function revealInFiles(target) {
+  try { const j = await api("api/reveal", target); if (j.error) alert(j.error); }
+  catch (err) { alert(String(err)); }
+}
+
+// ======================================================================== help and tour
+
+function renderHelp() {
+  const ref = t("ref");
+  $("helpToc").innerHTML = ref.map((s) => `<a data-sec="${s.id}">${s.t}</a>`).join("");
+  $("helpText").innerHTML = ref.map((s) => `<section id="ref-${s.id}"><h3>${s.t}</h3>${s.h}</section>`).join("");
+  $("helpToc").querySelectorAll("a[data-sec]").forEach((a) => a.onclick = () => $("ref-" + a.dataset.sec).scrollIntoView({ block: "start", behavior: "smooth" }));
+}
+function openHelp() { renderHelp(); $("helpText").scrollTop = 0; show("helpModal"); }
+
+let TOUR = null;  // { steps, i } while the tour runs
+
+function tourSteps() {
+  const weight = (a, b) => size(a) + size(b);
+  const pkgs = [...IX.pkgs.keys()].sort((a, b) => weight(IX.pkgDeps.get(b), IX.pkgUsers.get(b)) - weight(IX.pkgDeps.get(a), IX.pkgUsers.get(a)));
+  const topPkg = pkgs.find((p) => weight(IX.pkgDeps.get(p), IX.pkgUsers.get(p)) > 0);
+  const mods = DATA.nodes.filter((n) => n.k === "module" && !n.x && n.g !== undefined && !isEmptyInit(n.id)).map((n) => n.id)
+    .sort((a, b) => weight(IX.modDeps.get(b), IX.modUsers.get(b)) - weight(IX.modDeps.get(a), IX.modUsers.get(a)));
+  const topMod = mods[0];
+  const links = (id) => (IX.inc.get(id) || []).length + (IX.out.get(id) || []).length;
+  const syms = topMod ? descendants(topMod).filter((id) => links(id) > 0).sort((a, b) => links(b) - links(a)) : [];
+  const root = () => go({ type: "root" });
+  return [
+    { key: "welcome", enter: root },
+    { key: "project", sel: "#projectBtn" },
+    { key: "layers", sel: "#board .band", enter: root },
+    { key: "arrows", sel: topPkg && `#board .card[data-id="${cssEsc("pkg:" + topPkg)}"]`, skip: !topPkg, enter: () => { root(); select("pkg:" + topPkg); } },
+    { key: "tree", sel: "#tree" },
+    { key: "flow", sel: "#board .flow", skip: !topMod, enter: () => go({ type: "module", id: topMod }) },
+    { key: "details", sel: "#details", enter: () => { if (topMod) go({ type: "module", id: topMod }, syms[0] || null); } },
+    { key: "crumbs", sel: "#crumbs", skip: !topMod },
+    { key: "search", sel: ".search", enter: root },
+    { key: "maybe", sel: "#maybe" },
+    { key: "design", sel: "#view", skip: !DATA.design },
+    { key: "connect", sel: "#connectBtn" },
+    { key: "lang", sel: "#langBtn" },
+    { key: "help", sel: "#helpBtn" },
+  ].filter((s) => !s.skip);
+}
+
+function startTour() {
+  if (!DATA) return;
+  document.querySelectorAll(".modal").forEach((m) => m.style.display = "none");
+  $("toast").style.display = "none"; rememberTour();
+  TOUR = { steps: tourSteps(), i: 0 };
+  showTourStep();
+}
+function endTour() {
+  TOUR = null;
+  ["tourDim", "tourHi", "tourPop"].forEach((id) => $(id).style.display = "none");
+  go({ type: "root" });
+}
+function tourMove(d) {
+  if (!TOUR) return;
+  const i = TOUR.i + d;
+  if (i < 0) return;
+  if (i >= TOUR.steps.length) { endTour(); return; }
+  TOUR.i = i; showTourStep();
+}
+function showTourStep() {
+  const step = TOUR.steps[TOUR.i];
+  if (step.enter) step.enter();
+  const el = step.sel ? document.querySelector(step.sel) : null;
+  if (el && el.getClientRects().length) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  requestAnimationFrame(() => requestAnimationFrame(placeTour));  // after the view and its arrows are drawn
+}
+function placeTour() {
+  if (!TOUR) return;
+  const step = TOUR.steps[TOUR.i], last = TOUR.i === TOUR.steps.length - 1, text = t("tour")[step.key];
+  const pop = $("tourPop"), hi = $("tourHi"), dim = $("tourDim");
+  pop.innerHTML = `<div class="tstep">${TOUR.i + 1} / ${TOUR.steps.length}</div><h3>${text.t}</h3><p>${text.b}</p>` +
+    `<div class="trow"><button class="btn" id="tourClose">${t("tourClose")}</button><span class="gap"></span>` +
+    (TOUR.i ? `<button class="btn" id="tourBack">${t("tourBack")}</button>` : "") +
+    `<button class="btn primary" id="tourNext">${last ? t("tourDone") : t("tourNext")}</button></div>`;
+  $("tourClose").onclick = endTour; $("tourNext").onclick = () => tourMove(1);
+  if ($("tourBack")) $("tourBack").onclick = () => tourMove(-1);
+  dim.style.display = "block"; pop.style.display = "block";
+  const el = step.sel ? document.querySelector(step.sel) : null;
+  const vw = window.innerWidth, vh = window.innerHeight, pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 12;
+  if (!el || !el.getClientRects().length) {          // no target: the card sits in the middle of a dimmed page
+    hi.style.display = "none"; dim.style.background = "rgba(0,0,0,.5)";
+    pop.style.left = `${(vw - pw) / 2}px`; pop.style.top = `${Math.max(gap, (vh - ph) / 2)}px`;
+    $("tourNext").focus(); return;
+  }
+  dim.style.background = "transparent";              // the highlight's own shadow dims the page
+  const r = el.getBoundingClientRect(), pad = 6;
+  const box = { left: Math.max(4, r.left - pad), top: Math.max(4, r.top - pad), right: Math.min(vw - 4, r.right + pad), bottom: Math.min(vh - 4, r.bottom + pad) };
+  Object.assign(hi.style, { display: "block", left: `${box.left}px`, top: `${box.top}px`, width: `${box.right - box.left}px`, height: `${box.bottom - box.top}px` });
+  const clampX = (x) => Math.min(Math.max(gap, x), vw - pw - gap), clampY = (y) => Math.min(Math.max(gap, y), vh - ph - gap);
+  let x, y;
+  if (box.bottom + gap + ph < vh) { x = clampX(box.left); y = box.bottom + gap; }
+  else if (box.top - gap - ph > 0) { x = clampX(box.left); y = box.top - gap - ph; }
+  else if (box.right + gap + pw < vw) { x = box.right + gap; y = clampY(box.top); }
+  else if (box.left - gap - pw > 0) { x = box.left - gap - pw; y = clampY(box.top); }
+  else { x = clampX((vw - pw) / 2); y = vh - ph - gap; }
+  pop.style.left = `${x}px`; pop.style.top = `${y}px`;
+  $("tourNext").focus();
+}
+
+function tourSeen() { try { return localStorage.getItem("pmap.tour") === "seen"; } catch (err) { return false; } }
+function rememberTour() { try { localStorage.setItem("pmap.tour", "seen"); } catch (err) { /* storage blocked: the offer comes back next time */ } }
+function offerTour() { if (!tourSeen() && !/[?&]tour=0(&|$)/.test(location.search)) $("toast").style.display = "block"; }
+
+// links into the map: #select=pkg:<package> marks a package card, #open=<node id> opens a file or symbol,
+// #view=design shows the Architecture view
+function applyLocation() {
+  const m = /^(open|select|view)=(.+)$/.exec(decodeURIComponent(location.hash.slice(1)));
+  if (!m) return;
+  if (m[1] === "open") openNode(m[2]);
+  else if (m[1] === "select") requestAnimationFrame(() => select(m[2]));
+  else if (m[2] === "design" && DATA.design) { S.view = "design"; $("view").value = "design"; go({ type: "root" }); }
+}
+
+// ======================================================================== boot
+
+function load(data) {
+  DATA = data; IX = buildIndex(data, S.maybe);
+  $("project").textContent = data.project; document.title = data.project + " · Method Project Map";
+  $("view").style.display = data.design ? "" : "none"; if (!data.design) S.view = "pkg";
+  const s = S.scope;
+  if ((s.type === "pkg" && !IX.pkgs.has(s.id)) || (s.type === "module" && !IX.byId.has(s.id))) S.scope = { type: "root" };
+  if (S.sel && !IX.byId.has(S.sel) && !/^(pkg|sub):/.test(S.sel)) S.sel = null;
+  $("status").innerHTML = LIVE ? `<span class="dot"></span>${t("live")}` : t("staticCopy");
+  $("status").title = t("scanned", data.generated_at);
+}
+
+async function boot() {
+  let data = JSON.parse($("pmap-data").textContent);
+  if (!data && LIVE) data = await api("api/graph");
+  if (!data || !data.nodes) { $("details").innerHTML = `<div class="warn">${t("noData")}</div>`; return; }
+  if (LIVE) await loadProject();
+  S.version = data.version; load(data); render(); applyLocation(); offerTour();
+  if (LIVE) {
+    refreshConnection();
+    setInterval(async () => {
+      try { const st = await api("api/status");
+        if (st.version !== S.version) { const fresh = await api("api/graph"); S.version = fresh.version; load(fresh); render(); }
+      } catch (err) { $("status").innerHTML = `<span class="warn">${t("stopped")}</span>`; }
+    }, 4000);
+  } else { $("connectBtn").dataset.tt = "staticConnectTitle"; $("connectBtn").title = t("staticConnectTitle"); $("projectBtn").querySelector(".caret").style.display = "none"; }
+}
+
+$("search").addEventListener("input", (e) => search(e.target.value));
+$("search").addEventListener("keydown", (e) => {
+  const items = $("results").querySelectorAll("div[data-i]");
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); active = Math.max(0, Math.min(items.length - 1, active + (e.key === "ArrowDown" ? 1 : -1)));
+    items.forEach((d, i) => d.classList.toggle("active", i === active)); if (items[active]) items[active].scrollIntoView({ block: "nearest" }); }
+  if (e.key === "Enter") choose(active);
+  if (e.key === "Escape") { $("results").style.display = "none"; e.target.blur(); }
+});
+$("search").addEventListener("blur", () => setTimeout(() => $("results").style.display = "none", 150));
+document.addEventListener("keydown", (e) => {
+  if (TOUR) {
+    if (e.key === "Escape") endTour();
+    else if (e.key === "ArrowRight") tourMove(1);
+    else if (e.key === "ArrowLeft") tourMove(-1);
+    else return;
+    e.preventDefault(); return;
+  }
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.key === "/") { e.preventDefault(); $("search").focus(); }
+  if (e.key === "Escape" || e.key === "Backspace") {
+    const open = [...document.querySelectorAll(".modal")].filter((m) => m.style.display === "flex");
+    if (open.length) { open.forEach((m) => m.style.display = "none"); return; }
+    up();
+  }
+});
+$("stage").addEventListener("click", (e) => {
+  if (e.target.closest(".card,.sym,a,button,.chip")) return;
+  if (!S.sel) return;
+  S.sel = null;
+  if (S.scope.type === "module") render(); else select(null);
+});
+$("view").onchange = (e) => { S.view = e.target.value; go({ type: "root" }); };
+$("maybe").onclick = () => { S.maybe = !S.maybe; $("maybe").textContent = t("maybe", S.maybe); IX = buildIndex(DATA, S.maybe); render(); };
+const show = (id) => $(id).style.display = "flex";
+$("mermaidBtn").onclick = () => { $("mmd").value = mermaid(); show("mermaidModal"); };
+$("copyMmd").onclick = async () => { try { await navigator.clipboard.writeText($("mmd").value); $("copyMmd").textContent = t("copied"); } catch (err) { $("mmd").select(); } };
+$("helpBtn").onclick = openHelp;
+$("tourBtn").onclick = startTour;
+$("toastStart").onclick = startTour;
+$("toastLater").onclick = () => { rememberTour(); $("toast").style.display = "none"; };
+$("connectBtn").onclick = () => {
+  if (!LIVE) { alert(t("staticConnect")); return; }
+  refreshConnection(); $("connRes").style.display = "none"; show("connectModal");
+};
+$("doConnect").onclick = () => connect("connect");
+$("langBtn").onclick = () => {
+  LANG = LANG === "ru" ? "en" : "ru";
+  try { localStorage.setItem("pmap.lang", LANG); } catch (err) { /* storage blocked: the choice lasts until reload */ }
+  applyLang(); if (DATA) { load(DATA); render(); }
+  if ($("projectModal").style.display === "flex") renderProjects();
+  if ($("helpModal").style.display === "flex") renderHelp();
+  if (TOUR) placeTour();
+};
+$("projectBtn").onclick = openProjects;
+$("projPick").onclick = () => switchProject(null, true);
+$("projOpen").onclick = () => switchProject($("projInput").value);
+$("projInput").addEventListener("keydown", (e) => { if (e.key === "Enter") switchProject($("projInput").value); });
+$("projReveal").onclick = () => revealInFiles({ path: "" });
+$("disconnectBtn").onclick = () => connect("disconnect");
+document.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => b.closest(".modal").style.display = "none");
+window.addEventListener("resize", () => { requestAnimationFrame(drawWires); if (TOUR) requestAnimationFrame(placeTour); });
+applyLang();
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Paths Method Project Map leaves out of the map of this repository (globs; a trailing / skips a folder).
+plugins/*/lib/
+bench/corpora/
+bench/hidden_tests/

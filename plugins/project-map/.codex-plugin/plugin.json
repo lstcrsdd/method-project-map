@@ -1,0 +1,32 @@
+{
+  "name": "project-map",
+  "version": "0.2.0",
+  "description": "Static, LLM-free map of a Python repository: packages, modules, classes, functions and the links between them, for agents (overview at session start, find/show/source tools) and people (interactive web view).",
+  "author": {
+    "name": "lstcrsdd",
+    "url": "https://github.com/lstcrsdd"
+  },
+  "keywords": [
+    "code map",
+    "architecture",
+    "navigation",
+    "python",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.codex-mcp.json",
+  "interface": {
+    "displayName": "Method Project Map",
+    "shortDescription": "Map of the repository's structure and links",
+    "longDescription": "Static, LLM-free map of a Python repository: packages, modules, classes, functions and the links between them, for agents (overview at session start, find/show/source tools) and people (interactive web view).",
+    "developerName": "lstcrsdd",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Give me an overview of this repository",
+      "Who calls this function?"
+    ]
+  }
+}

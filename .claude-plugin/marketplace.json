@@ -1,0 +1,15 @@
+{
+  "name": "method-project-map",
+  "owner": {
+    "name": "lstcrsdd",
+    "url": "https://github.com/lstcrsdd"
+  },
+  "description": "Method Project Map: a static map of Python projects for coding agents and people.",
+  "plugins": [
+    {
+      "name": "project-map",
+      "source": "./plugins/project-map",
+      "description": "Project overview at session start, find/show/source tools, MCP server and an interactive web map."
+    }
+  ]
+}

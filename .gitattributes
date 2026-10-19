@@ -1,0 +1,6 @@
+# Windows scripts keep CRLF, shell scripts keep LF, images are binary
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.sh      text eol=lf
+*.command text eol=lf
+*.png     binary
