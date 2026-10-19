@@ -1,4 +1,5 @@
-"""Languages besides Python: TypeScript / JavaScript, Go, Java, Kotlin and C#, read with tree-sitter.
+"""Languages besides Python: TypeScript / JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C / C++,
+read with tree-sitter.
 
 tree-sitter is optional: `pmap langs install` (or `pip install "method-project-map[langs]"`) adds it. Without it
 these files are still counted in the map's `languages` section, marked as not mapped, and the rest of the map
@@ -22,15 +23,22 @@ LANGUAGES: Dict[str, dict] = {
     "java": {"name": "Java", "exts": (".java",), "grammars": ("java",)},
     "kotlin": {"name": "Kotlin", "exts": (".kt", ".kts"), "grammars": ("kotlin",)},
     "csharp": {"name": "C#", "exts": (".cs",), "grammars": ("csharp",)},
+    "swift": {"name": "Swift", "exts": (".swift",), "grammars": ("swift",)},
+    "dart": {"name": "Dart", "exts": (".dart",), "grammars": ("dart",)},
+    "rust": {"name": "Rust", "exts": (".rs",), "grammars": ("rust",)},
+    "cpp": {"name": "C / C++", "exts": (".c", ".h", ".cpp", ".cc", ".cxx", ".c++", ".hpp", ".hh", ".hxx", ".h++",
+                                         ".ipp", ".inl"), "grammars": ("c", "cpp")},
 }
 EXT_TO_LANGUAGE = {ext: lang for lang, spec in LANGUAGES.items() for ext in spec["exts"]}
 PIP_PACKAGES = ["tree-sitter>=0.22", "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-go",
-                "tree-sitter-java", "tree-sitter-kotlin", "tree-sitter-c-sharp"]
+                "tree-sitter-java", "tree-sitter-kotlin", "tree-sitter-c-sharp", "tree-sitter-swift", "tree-sitter-dart",
+                "tree-sitter-rust", "tree-sitter-c", "tree-sitter-cpp"]
 MAX_FILE_BYTES = 1_000_000  # bigger files are bundles or generated code
 SKIP_DIRS = {"node_modules", ".git", "dist", "build", "out", ".next", ".nuxt", ".svelte-kit", "coverage", "vendor",
              "target", ".gradle", "bin", "obj", ".venv", "venv", "env", ".pmap", "__pycache__", ".idea", ".vscode",
              ".turbo", ".cache", "storybook-static", ".expo", "Pods", "DerivedData", ".pytest_cache", ".playwright-cli",
-             ".aistudio"}
+             ".aistudio", ".build", ".dart_tool", ".swiftpm", "ephemeral", "Generated Files", ".vs", "x64", "ARM64",
+             "xcuserdata", "Carthage"}
 
 
 def available(language: str) -> bool:
@@ -39,9 +47,13 @@ def available(language: str) -> bool:
     return all(grammar_available(g) for g in LANGUAGES[language]["grammars"])
 
 
+_GENERATED_SUFFIXES = (".d.ts", ".min.js", ".bundle.js", ".generated.cs", ".g.cs", ".Designer.cs", ".g.dart",
+                       ".freezed.dart", ".mocks.dart", ".pb.dart", ".pbenum.dart", ".pbjson.dart", ".g.h", ".g.cpp",
+                       ".xaml.g.h", ".pb.h", ".pb.cc")
+
+
 def _skip_file(name: str) -> bool:
-    return (name.startswith("._") or name.endswith(".d.ts") or name.endswith(".min.js") or name.endswith(".bundle.js")
-            or name.endswith(".generated.cs") or name.endswith(".g.cs") or name.endswith(".Designer.cs"))
+    return name.startswith("._") or name.endswith(_GENERATED_SUFFIXES)
 
 
 def discover(repo_root: Path, ignore: Optional[List[str]] = None) -> List[Tuple[Path, str, str]]:
@@ -81,11 +93,11 @@ class LanguageScan:
 
 
 def scan(repo_root: Path, ignore: Optional[List[str]] = None) -> LanguageScan:
-    from pmap.langs import csharp, golang, javascript, jvm
+    from pmap.langs import cfamily, csharp, dart, golang, javascript, jvm, rust, swift
     from pmap.langs.resolve import Resolver
 
     extractors = {"typescript": javascript, "javascript": javascript, "go": golang, "java": jvm, "kotlin": jvm,
-                  "csharp": csharp}
+                  "csharp": csharp, "swift": swift, "dart": dart, "rust": rust, "cpp": cfamily}
     result = LanguageScan()
     files = discover(repo_root, ignore)
     counts: Dict[str, int] = {}

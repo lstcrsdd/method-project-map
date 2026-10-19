@@ -4,7 +4,7 @@
     "name": "lstcrsdd",
     "url": "https://github.com/lstcrsdd"
   },
-  "description": "Method Project Map: a static map of codebases (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#) for coding agents and people.",
+  "description": "Method Project Map: a static map of codebases (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) for coding agents and people.",
   "plugins": [
     {
       "name": "project-map",

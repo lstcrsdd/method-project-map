@@ -14,8 +14,9 @@ from typing import Optional
 
 PROJECT_MARKERS = (".git", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", ".pmap", "design.yaml",
                    "package.json", "tsconfig.json", "go.mod", "pom.xml", "build.gradle", "build.gradle.kts",
-                   "settings.gradle", "settings.gradle.kts")
-PROJECT_SUFFIXES = (".sln", ".csproj")
+                   "settings.gradle", "settings.gradle.kts", "Cargo.toml", "pubspec.yaml", "Package.swift",
+                   "CMakeLists.txt", "meson.build", "Makefile")
+PROJECT_SUFFIXES = (".sln", ".csproj", ".vcxproj", ".xcodeproj", ".xcworkspace")
 SKIP_DIRS = {".git", ".venv", "venv", "env", "node_modules", "__pycache__", ".pmap", "dist", "build", ".tox", ".mypy_cache"}
 MAX_PY_FILES = 6000
 CONTEXT_CHARS = 7500
@@ -38,7 +39,7 @@ def project_root(start: Path) -> Optional[Path]:
         if any((candidate / marker).exists() for marker in PROJECT_MARKERS) or _has_suffix(candidate):
             return candidate
     # no project marker: a folder that directly holds Python packages is a project too (other languages
-    # always come with a marker: package.json, go.mod, pom.xml, build.gradle, *.csproj)
+    # always come with a marker: package.json, go.mod, pom.xml, build.gradle, Cargo.toml, pubspec.yaml, *.csproj ...)
     if current != home and current != Path(current.anchor) and _has_python_package(current):
         return current
     return None

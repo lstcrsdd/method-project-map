@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 — 2026-10-19
+
+**More languages:** Swift, Dart / Flutter, Rust and C / C++ (Win32, C++/WinRT).
+
+- **Swift:** SwiftPM and Xcode modules, protocols, extensions.
+- **Dart:** `package:` imports, `export` barrels, prefixes, `part` files, widgets, mixins and extensions.
+- **Rust:** crates and workspaces, `mod` files, `use` paths, `pub use`, `impl` blocks and traits, `Self`, `?` and `unwrap()`.
+- **C / C++:** `#include`, namespaces, methods defined outside their class (header declarations give way to definitions).
+
+**Better links in every typed language:**
+- A call through a variable or field of a project class is now **confirmed** when no subclass overrides the method, because the compiler checks declared types. Through an interface, protocol or trait it stays **possible**. Python keeps its rule, since annotations are not checked.
+- Types follow call chains (`a.b().c()`), fields of variables, getters and static fields in the middle of a chain, enum variants and generic bounds (`P: Trait`, `impl Trait`).
+- Values made by library calls, and methods inherited from library types, are library calls, not gaps in the map.
+
+**Measured on real code** (share of the calls the map judges):
+
+| Code | Confirmed / possible / unresolved |
+|---|---|
+| Flutter framework | 90% / 3% / 7% |
+| Go `net/http` | 73% / 4% / 23% |
+| Rust `time` | 65% / 4% / 31% |
+| Rust `openmls`, library code | 61% / 0% / 39% |
+
 ## 0.3.0 — 2026-10-19
 
 **Languages besides Python.** TypeScript / JavaScript, Go, Java, Kotlin and C# are mapped with tree-sitter, with the same confidence rules as Python (resolved / inferred / unresolved). One project may mix languages.

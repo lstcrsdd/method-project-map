@@ -1,0 +1,5 @@
+name: vpn_app
+description: VPN client
+dependencies:
+  flutter:
+    sdk: flutter

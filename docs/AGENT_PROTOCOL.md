@@ -13,10 +13,10 @@ Benchmarks showed that agents almost never call map tools on their own. With the
 | Any agent | `pmap context <repo> --max-chars 8000` or MCP `pmap_overview` | — |
 
 The hook acts only in code projects, which it recognises in two ways:
-- a project marker (`.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `package.json`, `tsconfig.json`, `go.mod`, `pom.xml`, `build.gradle(.kts)`, `settings.gradle(.kts)`, `*.sln`, `*.csproj`, `design.yaml`, `.pmap`);
+- a project marker (`.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `package.json`, `tsconfig.json`, `go.mod`, `pom.xml`, `build.gradle(.kts)`, `settings.gradle(.kts)`, `Cargo.toml`, `pubspec.yaml`, `Package.swift`, `CMakeLists.txt`, `*.sln`, `*.csproj`, `*.vcxproj`, `*.xcodeproj`, `design.yaml`, `.pmap`);
 - or a folder that directly contains a Python package.
 
-Languages besides Python (TypeScript / JavaScript, Go, Java, Kotlin, C#) are on the map when their tree-sitter grammars are installed (`pmap langs install`); the overview names any language that is not.
+Languages besides Python (TypeScript / JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C / C++) are on the map when their tree-sitter grammars are installed (`pmap langs install`); the overview names any language that is not.
 
 It stays silent in the home folder, outside projects, and on any error. Output is kept under Claude Code's 10,000-character limit.
 

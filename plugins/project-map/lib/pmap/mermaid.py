@@ -196,7 +196,7 @@ def format_agent_context(
         "Edges listed are statically proven (resolved); inferred/unresolved ones are omitted.",
     ]
     names = {"python": "Python", "typescript": "TypeScript", "javascript": "JavaScript", "go": "Go", "java": "Java",
-             "kotlin": "Kotlin", "csharp": "C#"}
+             "kotlin": "Kotlin", "csharp": "C#", "swift": "Swift", "dart": "Dart", "rust": "Rust", "cpp": "C/C++"}
     if actual.languages and (len(actual.languages) > 1 or "python" not in actual.languages):
         parts = [f"{names.get(k, k)} {v.get('files', 0)} files" + ("" if v.get("mapped") else " (NOT MAPPED)")
                  for k, v in sorted(actual.languages.items(), key=lambda kv: -kv[1].get("files", 0))]

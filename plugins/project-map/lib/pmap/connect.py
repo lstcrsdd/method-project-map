@@ -108,7 +108,7 @@ def install_languages(root: Optional[Path] = None, log=print) -> List[str]:
             raise RuntimeError("could not create a virtual environment (on Debian/Ubuntu: apt install python3-venv): "
                                + (made.stderr or made.stdout).strip()[-400:])
         report.append(f"Environment: {root / 'venv'}")
-    log("Installing tree-sitter grammars (TypeScript/JavaScript, Go, Java, Kotlin, C#) ...")
+    log("Installing tree-sitter grammars (TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) ...")
     pip = subprocess.run([str(python), "-m", "pip", "install", "--disable-pip-version-check", "--quiet", "--upgrade",
                           *PIP_PACKAGES], capture_output=True, text=True)
     if pip.returncode != 0:

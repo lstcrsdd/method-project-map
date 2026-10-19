@@ -17,7 +17,7 @@ This guide covers installing Method Project Map, reading the map, checking archi
 
 ## 1. Install
 
-You need **Python 3.9 or newer** to run the tool, whatever language your project is in. Python projects need nothing else. For TypeScript / JavaScript, Go, Java, Kotlin and C# the installer downloads the tree-sitter grammars (about 10 MB from PyPI) into its own environment, `~/.pmap/venv`; `--python-only` skips that, and `pmap langs install` adds it later.
+You need **Python 3.9 or newer** to run the tool, whatever language your project is in. Python projects need nothing else. For TypeScript / JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C / C++ the installer downloads the tree-sitter grammars (about 15 MB from PyPI) into its own environment, `~/.pmap/venv`; `--python-only` skips that, and `pmap langs install` adds it later.
 
 ```bash
 git clone https://github.com/lstcrsdd/method-project-map.git
@@ -109,8 +109,8 @@ The map never presents a guess as a fact. Every link has a confidence level:
 
 | Label | Meaning | What to do |
 |---|---|---|
-| **confirmed** (`resolved`) | proven from the code: a direct import, a call of an imported function, a base class | rely on it |
-| **possible** (`inferred`) | likely but not proven: a call through a typed parameter, a method a subclass may override, a variable assigned in several places | check it in the code; hidden by default, turn on **Possible links** |
+| **confirmed** (`resolved`) | proven from the code: a direct import, a call of an imported function, a base class, a method of a typed variable's class that no subclass overrides | rely on it |
+| **possible** (`inferred`) | likely but not proven: a call through an interface, protocol or trait, a method a subclass overrides, a Python annotation, a variable assigned in several places | check it in the code; hidden by default, turn on **Possible links** |
 | **unresolved** | the target is unknown | listed in the side panel as *Calls the map could not resolve*; read the code |
 
 The analysis is static and closed-world: it does not see calls from code outside the repository, functions replaced at run time (monkey-patching) or lookups by name with `getattr`.
@@ -147,7 +147,7 @@ Click the **project name** at the top left to:
 
 Any folder with source code works. A home folder or a whole disk is refused: choose one project.
 
-**Languages.** Python is built in. TypeScript / JavaScript, Go, Java, Kotlin and C# need the grammars (`pmap langs` shows what is installed, `pmap langs install` adds the rest). Languages can be mixed in one project; the project panel lists them and flags any that are not on the map. What the map follows:
+**Languages.** Python is built in. TypeScript / JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C / C++ need the grammars (`pmap langs` shows what is installed, `pmap langs install` adds the rest). Languages can be mixed in one project; the project panel lists them and flags any that are not on the map. What the map follows:
 
 | Language | Imports and names | Calls |
 |---|---|---|
@@ -155,6 +155,10 @@ Any folder with source code works. A home folder or a whole disk is refused: cho
 | Go | `go.mod` module paths, aliases, all files of a package | package functions, struct literals, methods (exact for concrete types, possible through interfaces), embedding |
 | Java / Kotlin | package declarations, single, wildcard and static imports, same-package classes, Kotlin aliases and top-level functions | static and instance methods, constructors, implicit `this`, typed fields and locals |
 | C# | namespaces (block and file-scoped) and their parents, `using`, `using static`, `global using`, aliases | static and instance methods, constructors, implicit `this`, typed fields, properties and locals |
+| Swift | the module's files (SwiftPM target or Xcode folder), `import` of other modules | types, `init`, methods incl. extensions, protocols, implicit `self`, typed properties and locals |
+| Dart / Flutter | `package:` and relative imports, `export` barrels, `as` prefixes, `show`, `part` files | constructors and widgets, methods incl. extensions and mixins, implicit `this`, closures with typed parameters |
+| Rust | crates, workspaces, `mod` files, `use` with `crate::` / `self::` / `super::`, `pub use` | functions, `Type::new()`, methods from `impl` blocks and traits, `Self`, typed `let`, `?` and `unwrap()` |
+| C / C++ | `#include` (next to the file or by path suffix), namespaces, `using namespace` | functions and methods, `Type::m` defined in a .cpp, constructors, `obj.m()` / `ptr->m()` on typed variables |
 
 Ids of non-Python code use the file path: `sym:src/billing/invoice.ts:InvoiceService.issue`.
 

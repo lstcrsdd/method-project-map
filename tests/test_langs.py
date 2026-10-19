@@ -73,8 +73,9 @@ class TestTypeScript(LangCase):
         self.assertEdge(self.INV, "ambiguous:this.describe", "inferred",
                         candidates=["sym:src/models/order.ts:BaseService.describe",
                                     "sym:src/billing/invoice.ts:SpecialInvoiceService.describe"])
-        self.assertEdge(self.INV, "sym:src/billing/invoice.ts:Repo.save", "inferred")  # field typed by a parameter property
-        self.assertEdge(self.INV, "sym:src/core/money.ts:Money.add", "inferred")  # local from `new Money()`
+        self.assertEdge(self.INV, "sym:src/billing/invoice.ts:Repo.save", "inferred")  # an interface: any implementation
+        # the compiler checks declared types: a class's method nobody overrides is exact
+        self.assertEdge(self.INV, "sym:src/core/money.ts:Money.add", "resolved")  # local from `new Money()`
         self.assertEdge(self.INV, "unresolved:unknownThing.run", "unresolved")
         self.assertNoEdge("sym:src/core/money.ts:sum", "unresolved:values.reduce")  # array method: not a project link
 
@@ -120,7 +121,8 @@ class TestJvm(LangCase):
         self.assertEdge(issue, self.J + "money/Money.java:Money.sum", "resolved")  # static, imported class
         self.assertEdge(issue, self.J + "billing/BaseService.java:BaseService.describe", "resolved")  # implicit this
         self.assertEdge(issue, self.J + "billing/Helper.java:Helper.log", "resolved")  # same package, no import
-        self.assertEdge(issue, self.K + "orders/Order.kt:Order.count", "inferred")  # Kotlin class via wildcard import
+        self.assertEdge(issue, self.K + "orders/Order.kt:Order.count", "resolved")  # Kotlin class via wildcard import
+        self.assertEdge(issue, self.J + "money/Money.java:Money.add", "resolved")  # typed local
         self.assertEdge(issue, "ambiguous:repo.save", "inferred",
                         candidates=[self.J + "billing/Repo.java:Repo.save", self.K + "app/App.kt:FakeRepo.save"])
         self.assertEdge(issue, "unresolved:unknown.call", "unresolved")
@@ -129,7 +131,7 @@ class TestJvm(LangCase):
         main = self.K + "app/App.kt:main"
         self.assertEdge(main, self.J + "billing/InvoiceService.java:InvoiceService", "resolved")
         self.assertEdge(main, self.K + "orders/Order.kt:formatOrder", "resolved")  # imported top-level function
-        self.assertEdge(main, self.J + "billing/InvoiceService.java:InvoiceService.issue", "inferred")
+        self.assertEdge(main, self.J + "billing/InvoiceService.java:InvoiceService.issue", "resolved")
         self.assertEdge(self.K + "app/App.kt:FakeRepo", self.J + "billing/Repo.java:Repo", "resolved", "inherits")
         self.assertEdge("mod:src/main/java/com/shop/billing/InvoiceService.java", "ext:java.util", "resolved", "imports")
 
@@ -143,7 +145,7 @@ class TestCSharp(LangCase):
         self.assertEdge(self.ISSUE, "sym:Money/Money.cs:Money.Sum", "resolved")  # through `using M = Shop.Money`
         self.assertEdge(self.ISSUE, "sym:Billing/BaseService.cs:BaseService.Describe", "resolved")
         self.assertEdge(self.ISSUE, "sym:Billing/BaseService.cs:Helper.Log", "resolved")  # same namespace
-        self.assertEdge(self.ISSUE, "sym:Orders/Order.cs:Order.Count", "inferred")
+        self.assertEdge(self.ISSUE, "sym:Orders/Order.cs:Order.Count", "resolved")
         self.assertEdge(self.ISSUE, "ambiguous:_repo.Save", "inferred",
                         candidates=["sym:Billing/BaseService.cs:IRepo.Save", "sym:Program.cs:FakeRepo.Save"])
         self.assertEdge(self.ISSUE, "unresolved:mystery.Call", "unresolved")
@@ -153,7 +155,102 @@ class TestCSharp(LangCase):
         self.assertEdge("mod:Billing/InvoiceService.cs", "mod:Orders/Order.cs", "resolved", "imports")
         self.assertEdge("mod:Billing/InvoiceService.cs", "mod:Money/Money.cs", "resolved", "imports")
         self.assertEdge("mod:Billing/InvoiceService.cs", "ext:System", "resolved", "imports")
-        self.assertEdge("mod:Program.cs", "sym:Billing/InvoiceService.cs:InvoiceService.Issue", "inferred")
+        self.assertEdge("mod:Program.cs", "sym:Billing/InvoiceService.cs:InvoiceService.Issue", "resolved")
+
+
+@needs("rust")
+class TestRust(LangCase):
+    project = "rust_vpn"
+    CONNECT = "sym:src/tunnel/mod.rs:Tunnel.connect"
+
+    def test_modules_and_uses(self) -> None:
+        self.assertEdge("mod:src/lib.rs", "mod:src/tunnel/mod.rs", "resolved", "imports")  # `pub mod tunnel;`
+        self.assertEdge("mod:src/tunnel/mod.rs", "mod:src/tunnel/session.rs", "resolved", "imports")  # mod.rs layout
+        self.assertEdge("mod:src/main.rs", "mod:src/config.rs", "resolved", "imports")  # `use vpn_core::config::...`
+        self.assertEdge("sym:src/config.rs:ConfigStore.load", "sym:src/util.rs:default_server", "resolved")  # crate::
+
+    def test_calls(self) -> None:
+        self.assertEdge(self.CONNECT, "sym:src/config.rs:ConfigStore.load", "resolved")  # self.store: ConfigStore
+        self.assertEdge(self.CONNECT, "sym:src/tunnel/session.rs:Session.open", "resolved")  # via `pub use`
+        self.assertEdge(self.CONNECT, "sym:src/tunnel/session.rs:Session.handshake", "resolved")  # `-> Self`
+        self.assertEdge(self.CONNECT, "sym:src/tunnel/mod.rs:Tunnel.log", "resolved")
+        self.assertEdge(self.CONNECT, "ambiguous:self.transport.send", "inferred",  # Box<dyn Transport>
+                        candidates=["sym:src/tunnel/mod.rs:Transport.send", "sym:src/tunnel/udp.rs:UdpTransport.send"])
+        self.assertEdge(self.CONNECT, "unresolved:mystery.call", "unresolved")
+        self.assertEdge("sym:src/main.rs:main", "sym:src/tunnel/mod.rs:Tunnel.connect", "resolved")  # let t = Tunnel::new()
+        self.assertEdge("sym:src/tunnel/udp.rs:UdpTransport@impl", "sym:src/tunnel/mod.rs:Transport", "resolved",
+                        "inherits")  # impl Transport for UdpTransport
+        self.assertFalse([e for e in self.map.edges if "to_string" in e.to_id])  # &str: a library type
+
+
+@needs("swift")
+class TestSwift(LangCase):
+    project = "swift_vpn"
+    START = "sym:Sources/VPNCore/TunnelManager.swift:TunnelManager.start"
+
+    def test_module_and_calls(self) -> None:
+        self.assertEdge(self.START, "sym:Sources/VPNCore/ConfigStore.swift:ConfigStore.load", "resolved")  # same module
+        self.assertEdge(self.START, "sym:Sources/VPNCore/Session.swift:Session", "resolved")  # Session(profile:)
+        self.assertEdge(self.START, "sym:Sources/VPNCore/Session.swift:Session.connect", "resolved")
+        self.assertEdge(self.START, "sym:Sources/VPNCore/Logger.swift:TunnelManager.log", "resolved")  # an extension
+        self.assertEdge(self.START, "sym:Sources/VPNCore/TunnelManager.swift:BaseManager.describe", "resolved")
+        self.assertEdge(self.START, "ambiguous:transport.send", "inferred",  # a protocol
+                        candidates=["sym:Sources/VPNCore/TunnelManager.swift:Transport.send",
+                                    "sym:Sources/VPNCore/UDPTransport.swift:UDPTransport.send"])
+        self.assertEdge(self.START, "unresolved:mystery.call", "unresolved")
+
+    def test_other_module_and_top_level_code(self) -> None:
+        main = "mod:Sources/App/main.swift"
+        self.assertEdge(main, "sym:Sources/VPNCore/TunnelManager.swift:TunnelManager.start", "resolved")
+        self.assertEdge(main, "mod:Sources/VPNCore/TunnelManager.swift", "resolved", "imports")  # `import VPNCore`
+        self.assertEdge("mod:Sources/VPNCore/TunnelManager.swift", "ext:Foundation", "resolved", "imports")
+
+
+@needs("dart")
+class TestDart(LangCase):
+    project = "dart_vpn"
+    CONNECT = "sym:lib/src/tunnel.dart:TunnelService.connect"
+
+    def test_library_imports(self) -> None:
+        self.assertEdge("mod:lib/vpn.dart", "mod:lib/src/tunnel.dart", "resolved", "imports")  # export
+        self.assertEdge("mod:lib/ui/home.dart", "mod:lib/vpn.dart", "resolved", "imports")  # package:vpn_app/...
+        self.assertEdge("mod:lib/ui/home.dart", "ext:flutter", "resolved", "imports")
+
+    def test_calls_and_widgets(self) -> None:
+        self.assertEdge(self.CONNECT, "sym:lib/src/config.dart:ConfigStore.load", "resolved")
+        self.assertEdge(self.CONNECT, "sym:lib/src/tunnel.dart:Session.open", "resolved")
+        self.assertEdge(self.CONNECT, "sym:lib/src/tunnel.dart:TunnelService._log", "resolved")  # implicit this
+        self.assertEdge(self.CONNECT, "ambiguous:transport.send", "inferred")  # an abstract class with implementors
+        self.assertEdge(self.CONNECT, "unresolved:mystery.call", "unresolved")
+        self.assertEdge("sym:lib/ui/home.dart:HomePage.build", "sym:lib/src/tunnel.dart:TunnelService.connect",
+                        "resolved")  # through the barrel export
+        self.assertEdge("sym:lib/ui/home.dart:HomePage.build", "sym:lib/ui/home.dart:StatusCard", "resolved")  # widget
+        self.assertEdge("sym:lib/main.dart:main", "sym:lib/src/tunnel.dart:TunnelService", "resolved")  # vpn.Tunnel...
+        self.assertNoEdge("sym:lib/main.dart:main", "unresolved:runApp")  # Flutter's own function
+
+
+@needs("cpp")
+class TestCpp(LangCase):
+    project = "cpp_vpn"
+    START = "sym:src/manager.cpp:Manager.Start"
+
+    def test_includes_and_out_of_line_methods(self) -> None:
+        self.assertEdge("mod:src/manager.cpp", "mod:include/tunnel/manager.h", "resolved", "imports")
+        self.assertEdge("mod:src/main.cpp", "ext:windows.h", "resolved", "imports")
+        node = next(n for n in self.map.nodes if n.id == self.START)
+        self.assertEqual((node.name, node.qualified_name), ("Manager::Start", "vpn::Manager::Start"))
+
+    def test_calls(self) -> None:
+        self.assertEdge(self.START, "sym:src/config.cpp:ConfigStore.Load", "resolved")  # the definition, not config.h
+        self.assertEdge(self.START, "sym:src/session.cpp:Session.Open", "resolved")
+        self.assertEdge(self.START, "sym:src/manager.cpp:Manager.Log", "resolved")  # implicit this
+        self.assertEdge(self.START, "sym:src/util.cpp:Format", "resolved")  # util::Format inside namespace vpn
+        self.assertEdge(self.START, "ambiguous:transport_.Send", "inferred",  # a virtual method with an override
+                        candidates=["sym:include/tunnel/manager.h:Transport.Send",
+                                    "sym:src/udp_transport.cpp:UdpTransport.Send"])
+        self.assertNoEdge(self.START, "unresolved:MessageBoxW")  # Win32 comes from <windows.h>
+        self.assertEdge("sym:src/main.cpp:main", "sym:include/tunnel/manager.h:Manager", "resolved")  # Manager m(...)
+        self.assertEdge("sym:src/main.cpp:main", "sym:src/manager.cpp:Manager.Start", "resolved")
 
 
 class TestWithoutGrammars(unittest.TestCase):

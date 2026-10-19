@@ -183,7 +183,7 @@ def check_project_folder(raw: str) -> Path:
         raise ProjectFolderError("too_wide", "that is your home folder or a whole disk; choose one project folder")
     files = count_source_files(path, MAX_PROJECT_FILES)
     if files == 0:
-        raise ProjectFolderError("no_python", f"no source files (Python, TypeScript, JavaScript, Go, Java, Kotlin, C#) in {path}")
+        raise ProjectFolderError("no_python", f"no source files (Python, TypeScript, JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) in {path}")
     if files > MAX_PROJECT_FILES:
         raise ProjectFolderError("too_wide", f"more than {MAX_PROJECT_FILES} source files in {path}")
     return path

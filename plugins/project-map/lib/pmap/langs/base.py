@@ -16,6 +16,11 @@ GRAMMARS: Dict[str, Tuple[str, str]] = {
     "java": ("tree_sitter_java", "language"),
     "kotlin": ("tree_sitter_kotlin", "language"),
     "csharp": ("tree_sitter_c_sharp", "language"),
+    "rust": ("tree_sitter_rust", "language"),
+    "swift": ("tree_sitter_swift", "language"),
+    "dart": ("tree_sitter_dart", "language"),
+    "c": ("tree_sitter_c", "language"),
+    "cpp": ("tree_sitter_cpp", "language"),
 }
 
 _parsers: Dict[str, object] = {}
@@ -64,6 +69,8 @@ class Decl:
     receiver: Optional[str] = None  # Go: the receiver type of a method before it is attached
     interface: bool = False  # an interface (calls through it are never certain)
     returns: Optional[str] = None  # declared result type (first result in Go; Promise<T> / Task<T> unwrapped)
+    declaration_only: bool = False  # C/C++: declared here (a header), defined elsewhere
+    variants: List[str] = field(default_factory=list)  # enum cases: `Kind::A(..)` / `.a` make a value of the enum
     node_id: str = ""  # filled in by the resolver
 
     def qualified_parts(self) -> List[str]:
@@ -86,6 +93,7 @@ class Import:
     reexport: bool = False  # JS/TS `export {...} from` / `export * from`
     type_only: bool = False  # TS `import type`
     is_global: bool = False  # C# `global using`
+    scope: Optional[str] = None  # Rust: the inline module (`mod x { use ...; }`) the import sits in
 
 
 @dataclass
@@ -179,7 +187,13 @@ def preceding_comment(node, src: bytes, is_comment: Callable[[object], bool]) ->
 
 
 UNTRACKED = "?"  # var_types value: typed, but with a builtin / array / union type the map does not follow
+LOCAL = "~"  # var_types value: a local variable whose type the map does not know (calls on it stay unresolved)
 RESULT = "()"  # var_types prefix: the variable holds the result of calling this chain ("()" + "pkg.NewFoo")
+# After RESULT: "<callee>|m1|m2" = the callee's result, then the results of calling m1, m2 on it in turn;
+# "type:<T>" as the callee means "a value of type T" (a struct literal, `new T()` ...).
+PASS_THROUGH = {"unwrap", "expect", "unwrap_or_default", "unwrap_or", "unwrap_or_else", "clone", "to_owned", "as_ref",
+                "as_mut", "borrow", "borrow_mut", "lock", "read", "write", "deref", "deref_mut", "get_or_insert_with",
+                "copied", "cloned", "await", "first", "last", "single", "firstWhere", "requireNonNull"}
 
 
 def result_type_name(type_text: Optional[str]) -> Optional[str]:

@@ -37,15 +37,15 @@ def _similar(a: str, b: str) -> bool:
 
 def find_nodes(actual: ActualMap, query: str, limit: int = 30) -> list[ActualNode]:
     """Nodes whose name matches `query`: exact names first, then dotted-suffix and substring matches."""
-    q = query.strip().lower()
+    q = query.strip().lower().replace("::", ".")  # Rust / C++ paths: `Type::method` == `Type.method`
     if not q:
         return []
     exact, suffix, partial = [], [], []
     for node in actual.nodes:
         if node.external:
             continue
-        name = node.name.lower()
-        qualified = node.qualified_name.lower()
+        name = node.name.lower().replace("::", ".")
+        qualified = node.qualified_name.lower().replace("::", ".")
         if name == q or qualified == q:
             exact.append(node)
         elif qualified.endswith("." + q):

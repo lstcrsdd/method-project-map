@@ -18,7 +18,7 @@ from pmap import __version__  # noqa: E402
 from pmap.connect import BOOTSTRAP  # noqa: E402
 
 PLUGIN = ROOT / "plugins" / "project-map"
-DESCRIPTION = ("Static, LLM-free map of a codebase (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#): packages, files, classes, functions and the links between "
+DESCRIPTION = ("Static, LLM-free map of a codebase (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++): packages, files, classes, functions and the links between "
                "them, for agents (overview at session start, find/show/source tools) and people (interactive web view).")
 
 

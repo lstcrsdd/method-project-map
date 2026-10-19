@@ -1,12 +1,12 @@
 ---
 name: project-map
-description: Navigate code repositories (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#) with Method Project Map (pmap), a static, LLM-free map of packages, files, classes, functions and the call/import links between them. Use when starting work in a codebase, locating where behaviour is implemented, tracing callers and callees, or checking architecture rules — before reading many files.
+description: Navigate code repositories (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) with Method Project Map (pmap), a static, LLM-free map of packages, files, classes, functions and the call/import links between them. Use when starting work in a codebase, locating where behaviour is implemented, tracing callers and callees, or checking architecture rules — before reading many files.
 license: MIT
 ---
 
 # Method Project Map (pmap)
 
-`pmap` reads the code statically and answers "where is it and what touches it" without reading whole files. Measured on 29k-line codebases it halves the code an agent has to read, with no loss of fix quality. Python is built in; TypeScript/JavaScript, Go, Java, Kotlin and C# need the optional grammars (`{{PMAP}} langs` shows what is installed, `{{PMAP}} langs install` adds them).
+`pmap` reads the code statically and answers "where is it and what touches it" without reading whole files. Measured on 29k-line codebases it halves the code an agent has to read, with no loss of fix quality. Python is built in; TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C/C++ need the optional grammars (`{{PMAP}} langs` shows what is installed, `{{PMAP}} langs install` adds them).
 
 Command: `{{PMAP}}` (run from the repository root; `--repo <dir>` elsewhere). The same operations exist as MCP tools `pmap_overview`, `pmap_find`, `pmap_show`, `pmap_source`, `pmap_check` when the MCP server is connected.
 
@@ -22,7 +22,7 @@ Use plain text search as well when a symptom names literal strings, config keys 
 ## Trust rules
 
 - `resolved` links are proven statically — rely on them.
-- `inferred` links are candidates (typed parameters, overridable methods, several possible bindings) — verify in code.
+- `inferred` links are candidates (calls through an interface / protocol / trait, methods a subclass overrides, Python annotations, several possible bindings) — verify in code.
 - `unresolved` calls have unknown targets (dynamic dispatch, callbacks, untyped variables) — the map is silent there; read the code.
 - Calls into libraries and the standard library get no edge; the import records the dependency.
 - The map never invents edges, but it cannot see code outside the repository, monkey-patching or `getattr` tricks.
