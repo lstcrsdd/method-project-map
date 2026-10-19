@@ -102,8 +102,17 @@ class TestConnect(SandboxHome):
         codex.mkdir()
         (codex / "config.toml").write_text('model = "x"\n', encoding="utf-8")
 
-        agents.connect(claude=True, codex=True)
-        agents.connect(claude=True, codex=True)
+        gemini = self.home / ".gemini"
+        gemini.mkdir()
+        (gemini / "settings.json").write_text('{"security": {"auth": {"selectedType": "oauth-personal"}}}', encoding="utf-8")
+
+        agents.connect(claude=True, codex=True, gemini=True)
+        agents.connect(claude=True, codex=True, gemini=True)
+        gsettings = json.loads((gemini / "settings.json").read_text())
+        self.assertEqual(gsettings["security"]["auth"]["selectedType"], "oauth-personal")
+        self.assertEqual(gsettings["mcpServers"]["pmap"]["args"], ["mcp"])
+        self.assertEqual((gemini / "GEMINI.md").read_text().count("pmap:start"), 1)
+        self.assertTrue(agents.status()["gemini"]["connected"])
         settings = json.loads((claude / "settings.json").read_text())
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(len(settings["hooks"]["SessionStart"]), 2)
@@ -115,7 +124,10 @@ class TestConnect(SandboxHome):
         self.assertTrue(agents.status()["codex"]["connected"])
         self.assertTrue((claude / "settings.json.bak-pmap").exists())
 
-        agents.disconnect(claude=True, codex=True)
+        agents.disconnect(claude=True, codex=True, gemini=True)
+        self.assertEqual(json.loads((gemini / "settings.json").read_text()),
+                         {"security": {"auth": {"selectedType": "oauth-personal"}}})
+        self.assertFalse((gemini / "GEMINI.md").exists())
         self.assertEqual(json.loads((claude / "settings.json").read_text()), original)
         self.assertEqual((claude / "CLAUDE.md").read_text(), "# My rules\n")
         self.assertEqual((codex / "config.toml").read_text(), 'model = "x"\n')

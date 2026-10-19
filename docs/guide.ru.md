@@ -28,7 +28,7 @@ cd method-project-map
 |---|---|---|
 | Установить и подключить Claude Code (по умолчанию) | `./install.sh` | `install.bat` |
 | Установить и подключить Codex | `./install.sh --codex` | `install.bat --codex` |
-| Установить и подключить обоих агентов | `./install.sh --all` | `install.bat --all` |
+| Установить и подключить всех агентов (Claude Code, Codex, Gemini CLI) | `./install.sh --all` | `install.bat --all` |
 | Установить без подключения агентов | `./install.sh --none` | `install.bat --none` |
 | Не ставить грамматики других языков | добавьте `--python-only` | добавьте `--python-only` |
 
@@ -332,7 +332,7 @@ pmap html /путь/к/проекту -o map.html
 | `pmap stale ПАПКА` | что изменилось после последнего скана | `--json` |
 | `pmap mermaid ПАПКА` | схема Mermaid | `--level subsystem\|module`, `--design` |
 | `pmap mcp` | MCP-сервер через stdio | `--repo` |
-| `pmap connect` / `disconnect` | ИИ-агенты | `--claude`, `--codex`, `--all` |
+| `pmap connect` / `disconnect` | ИИ-агенты | `--claude`, `--codex`, `--gemini`, `--all` |
 | `pmap connection` | какие агенты подключены | |
 | `pmap shortcut` | создать ярлык приложения | `--remove` |
 | `pmap langs` | какие грамматики языков установлены | `install` |

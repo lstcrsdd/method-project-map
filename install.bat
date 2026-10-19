@@ -1,7 +1,7 @@
 @echo off
 rem Method Project Map installer for Windows.
 rem   install.bat            install the pmap command and connect Claude Code
-rem   install.bat --codex    connect Codex instead;   --all   both;   --none   only the pmap command
+rem   install.bat --codex    connect Codex instead (--gemini: Gemini CLI);   --all   every agent;   --none   only the pmap command
 rem   add --python-only to skip the grammars for TypeScript/JavaScript, Go, Java, Kotlin and C# (from PyPI)
 rem Undo:  "%USERPROFILE%\.pmap\bin\pmap.cmd" disconnect --all
 setlocal

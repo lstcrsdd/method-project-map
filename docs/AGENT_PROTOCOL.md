@@ -10,6 +10,7 @@ Benchmarks showed that agents almost never call map tools on their own. With the
 |---|---|---|
 | Claude Code | `SessionStart` hook → `pmap hook session-start` → `hookSpecificOutput.additionalContext` | `pmap connect --claude` or the plugin |
 | Codex | rule in `~/.codex/AGENTS.md`: run `pmap context` at task start | `pmap connect --codex` |
+| Gemini CLI | rule in `~/.gemini/GEMINI.md` (read by every session) + MCP server in `~/.gemini/settings.json` | `pmap connect --gemini` |
 | Any agent | `pmap context <repo> --max-chars 8000` or MCP `pmap_overview` | — |
 
 The hook acts only in code projects, which it recognises in two ways:
@@ -71,6 +72,7 @@ If `design.yaml` exists, run `pmap check .`. A new *divergence* means a dependen
 - `~/.claude/settings.json` — one `SessionStart` entry;
 - `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` — a `<!-- pmap:start -->…<!-- pmap:end -->` block;
 - `~/.codex/config.toml` — a `# >>> pmap … # <<< pmap` block;
+- `~/.gemini/settings.json` — an `mcpServers.pmap` entry, and `~/.gemini/GEMINI.md` — a marked rule block;
 - the user-scope MCP registration, made through `claude mcp add` when the CLI exists.
 
 Before the first change, each config file is backed up as `<name>.bak-pmap`. `pmap disconnect --all` removes exactly these additions.

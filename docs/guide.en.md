@@ -28,7 +28,7 @@ cd method-project-map
 |---|---|---|
 | Install and connect Claude Code (default) | `./install.sh` | `install.bat` |
 | Install and connect Codex | `./install.sh --codex` | `install.bat --codex` |
-| Install and connect both agents | `./install.sh --all` | `install.bat --all` |
+| Install and connect every agent (Claude Code, Codex, Gemini CLI) | `./install.sh --all` | `install.bat --all` |
 | Install without connecting any agent | `./install.sh --none` | `install.bat --none` |
 | Skip the grammars for other languages | add `--python-only` | add `--python-only` |
 
@@ -332,7 +332,7 @@ All commands: `pmap <command> --help`.
 | `pmap stale FOLDER` | changed since the last scan | `--json` |
 | `pmap mermaid FOLDER` | Mermaid diagram | `--level subsystem\|module`, `--design` |
 | `pmap mcp` | MCP server over stdio | `--repo` |
-| `pmap connect` / `disconnect` | AI agents | `--claude`, `--codex`, `--all` |
+| `pmap connect` / `disconnect` | AI agents | `--claude`, `--codex`, `--gemini`, `--all` |
 | `pmap connection` | which agents are connected | |
 | `pmap shortcut` | create the app shortcut | `--remove` |
 | `pmap langs` | which language grammars are installed | `install` |

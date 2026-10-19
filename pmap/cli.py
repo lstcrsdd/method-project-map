@@ -193,8 +193,12 @@ def cmd_html(args: argparse.Namespace) -> int:
 def cmd_connect(args: argparse.Namespace) -> int:
     from pmap.connect import connect
 
-    claude, codex = (True, True) if args.all else (args.claude or not args.codex, args.codex)
-    for line in connect(claude=claude, codex=codex):
+    if args.all:
+        claude = codex = gemini = True
+    else:
+        claude = args.claude or not (args.codex or args.gemini)
+        codex, gemini = args.codex, args.gemini
+    for line in connect(claude=claude, codex=codex, gemini=gemini):
         print(line)
     return 0
 
@@ -202,8 +206,8 @@ def cmd_connect(args: argparse.Namespace) -> int:
 def cmd_disconnect(args: argparse.Namespace) -> int:
     from pmap.connect import disconnect
 
-    claude, codex = (True, True) if args.all or not (args.claude or args.codex) else (args.claude, args.codex)
-    for line in disconnect(claude=claude, codex=codex):
+    every = args.all or not (args.claude or args.codex or args.gemini)
+    for line in disconnect(claude=every or args.claude, codex=every or args.codex, gemini=every or args.gemini):
         print(line)
     return 0
 
@@ -344,7 +348,8 @@ def build_parser() -> argparse.ArgumentParser:
         p = subparsers.add_parser(name, help=helptext)
         p.add_argument("--claude", action="store_true", help="Claude Code (default for connect)")
         p.add_argument("--codex", action="store_true", help="OpenAI Codex")
-        p.add_argument("--all", action="store_true", help="Both agents")
+        p.add_argument("--gemini", action="store_true", help="Gemini CLI")
+        p.add_argument("--all", action="store_true", help="Every supported agent: Claude Code, Codex, Gemini CLI")
         p.set_defaults(func=cmd_connect if name == "connect" else cmd_disconnect)
 
     p_langs = subparsers.add_parser("langs", help="Languages besides Python: show what is installed, or install it")

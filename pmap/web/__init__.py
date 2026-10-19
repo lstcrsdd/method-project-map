@@ -265,10 +265,12 @@ def _make_handler(state: _State):
                 from pmap import connect as agents
 
                 if url.path == "/api/connect":
-                    report = agents.connect(claude=bool(body.get("claude", True)), codex=bool(body.get("codex")))
+                    report = agents.connect(claude=bool(body.get("claude", True)), codex=bool(body.get("codex")),
+                                            gemini=bool(body.get("gemini")))
                     self._json({"report": report})
                 elif url.path == "/api/disconnect":
-                    report = agents.disconnect(claude=bool(body.get("claude", True)), codex=bool(body.get("codex")))
+                    report = agents.disconnect(claude=bool(body.get("claude", True)), codex=bool(body.get("codex")),
+                                               gemini=bool(body.get("gemini")))
                     self._json({"report": report})
                 elif url.path == "/api/pick":
                     prompt = str(body.get("prompt") or "Choose a project folder")[:200]

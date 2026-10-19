@@ -9,6 +9,8 @@
 - **Rust:** crates and workspaces, `mod` files, `use` paths, `pub use`, `impl` blocks and traits, `Self`, `?` and `unwrap()`.
 - **C / C++:** `#include`, namespaces, methods defined outside their class (header declarations give way to definitions).
 
+**Gemini CLI:** `pmap connect --gemini` (also part of `--all`) adds the MCP server to `~/.gemini/settings.json` and a rule to `~/.gemini/GEMINI.md`.
+
 **Better links in every typed language:**
 - A call through a variable or field of a project class is now **confirmed** when no subclass overrides the method, because the compiler checks declared types. Through an interface, protocol or trait it stays **possible**. Python keeps its rule, since annotations are not checked.
 - Types follow call chains (`a.b().c()`), fields of variables, getters and static fields in the middle of a chain, enum variants and generic bounds (`P: Trait`, `impl Trait`).

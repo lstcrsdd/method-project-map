@@ -34,6 +34,10 @@ def claude_dir() -> Path:
     return Path(os.environ.get("CLAUDE_CONFIG_DIR") or home() / ".claude")
 
 
+def gemini_dir() -> Path:
+    return home() / ".gemini"
+
+
 def codex_dir() -> Path:
     return Path(os.environ.get("CODEX_HOME") or home() / ".codex")
 
@@ -299,30 +303,98 @@ def codex_status() -> Dict:
     return {"connected": skill and mcp, "skill": skill, "mcp": mcp}
 
 
+# ------------------------------------------------------------------ Gemini CLI
+
+
+def _is_ours(entry) -> bool:
+    return isinstance(entry, dict) and entry.get("args") == ["mcp"] and str(entry.get("command", "")).replace(
+        "\\", "/").endswith((".pmap/bin/pmap", ".pmap/bin/pmap.cmd"))
+
+
+def connect_gemini(launcher: Path) -> List[str]:
+    """Gemini CLI: the `pmap` MCP server in ~/.gemini/settings.json and the rule in ~/.gemini/GEMINI.md."""
+    report = []
+    settings = gemini_dir() / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() and settings.read_text().strip() else {}
+    servers = data.setdefault("mcpServers", {})
+    if "pmap" in servers and not _is_ours(servers["pmap"]):
+        report.append("Gemini CLI: settings.json already has an mcpServers.pmap of its own; left unchanged")
+    else:
+        _backup(settings)
+        servers["pmap"] = {"command": str(launcher), "args": ["mcp"], "timeout": 120000}
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        report.append(f"Gemini CLI: MCP server `pmap` -> {settings}")
+    rules = gemini_dir() / "GEMINI.md"
+    _backup(rules)
+    rules.write_text(_replace_block(rules.read_text(encoding="utf-8") if rules.exists() else "", MD_START, MD_END,
+                                    _rule_text(launcher)), encoding="utf-8")
+    report.append(f"Gemini CLI: rule for every session -> {rules}")
+    return report
+
+
+def disconnect_gemini() -> List[str]:
+    report = []
+    settings = gemini_dir() / "settings.json"
+    if settings.exists():
+        data = json.loads(settings.read_text(encoding="utf-8") or "{}")
+        servers = data.get("mcpServers", {})
+        if _is_ours(servers.get("pmap")):
+            del servers["pmap"]
+            if not servers:
+                data.pop("mcpServers", None)
+            settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            report.append(f"Gemini CLI: removed MCP server `pmap` from {settings}")
+    rules = gemini_dir() / "GEMINI.md"
+    if rules.exists() and MD_START in rules.read_text(encoding="utf-8"):
+        rest = _replace_block(rules.read_text(encoding="utf-8"), MD_START, MD_END, None)
+        if rest.strip():
+            rules.write_text(rest, encoding="utf-8")
+        else:
+            rules.unlink()  # we created it
+        report.append(f"Gemini CLI: removed the pmap rule from {rules}")
+    return report or ["Gemini CLI: nothing to remove"]
+
+
+def gemini_status() -> Dict:
+    settings = gemini_dir() / "settings.json"
+    try:
+        mcp = _is_ours(json.loads(settings.read_text(encoding="utf-8")).get("mcpServers", {}).get("pmap"))
+    except (OSError, ValueError):
+        mcp = False
+    rules = gemini_dir() / "GEMINI.md"
+    rule = rules.exists() and MD_START in rules.read_text(encoding="utf-8")
+    return {"connected": mcp and rule, "mcp": mcp, "rule": rule}
+
+
 # ------------------------------------------------------------------ entry points
 
 
-def connect(claude: bool = True, codex: bool = False) -> List[str]:
+def connect(claude: bool = True, codex: bool = False, gemini: bool = False) -> List[str]:
     launcher = install_runtime()
     report = [f"Runtime: {launcher}"]
     if claude:
         report += connect_claude(launcher)
     if codex:
         report += connect_codex(launcher)
+    if gemini:
+        report += connect_gemini(launcher)
     if claude:
         report.append("New Claude Code sessions in code projects now start with a project map overview.")
     return report
 
 
-def disconnect(claude: bool = True, codex: bool = True) -> List[str]:
+def disconnect(claude: bool = True, codex: bool = True, gemini: bool = True) -> List[str]:
     report: List[str] = []
     if claude:
         report += disconnect_claude()
     if codex:
         report += disconnect_codex()
+    if gemini:
+        report += disconnect_gemini()
     return report
 
 
 def status() -> Dict:
     return {"runtime": str(launcher_path()) if launcher_path().exists() else None,
-            "claude": claude_status(), "codex": codex_status()}
+            "claude": claude_status(), "codex": codex_status(), "gemini": gemini_status()}

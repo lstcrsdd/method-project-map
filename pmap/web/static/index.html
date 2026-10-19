@@ -186,6 +186,7 @@ pre.src { font-family: var(--mono); font-size: 11.5px; background: var(--chip); 
   <div id="connState" class="muted" data-t="checking"></div>
   <label><input type="checkbox" id="cClaude" checked> <span data-th="connClaude"></span></label>
   <label><input type="checkbox" id="cCodex"> <span data-th="connCodex"></span></label>
+  <label><input type="checkbox" id="cGemini"> <span data-th="connGemini"></span></label>
   <div class="res" id="connRes"></div>
   <div class="row"><button class="btn" id="disconnectBtn" data-t="disconnect"></button><button class="btn" data-close data-t="close"></button><button class="btn primary" id="doConnect" data-t="doConnect"></button></div></div></div>
 
@@ -250,7 +251,8 @@ const L = {
     connClaude: "Claude Code — skill + overview at every session start + MCP tools when the <code>claude</code> CLI is available",
     connCodex: "Codex — skill + MCP server + a rule in <code>~/.codex/AGENTS.md</code>",
     disconnect: "Disconnect", doConnect: "Connect", isConnected: "connected", notConnected: "not connected",
-    connState: (c, x) => `Claude Code: ${c} · Codex: ${x}`, noServer: "Cannot reach the local server.", working: "Working…", done: "done",
+    connState: (c, x, g) => `Claude Code: ${c} · Codex: ${x} · Gemini CLI: ${g}`, noServer: "Cannot reach the local server.", working: "Working…", done: "done",
+    connGemini: "Gemini CLI — MCP server + a rule in <code>~/.gemini/GEMINI.md</code>",
     staticConnectTitle: "Run `pmap connect` in a terminal (a static export cannot change settings)",
     staticConnect: "This is a static export. To connect agents, run in a terminal:\n\n  pmap connect --claude\n\n(or use install.sh / install.bat)",
     projHead: "Project", projNow: "Showing now:", projOther: "Open another project",
@@ -315,7 +317,8 @@ const L = {
     connClaude: "Claude Code — навык + обзор в начале каждой сессии + MCP-инструменты, если установлен CLI <code>claude</code>",
     connCodex: "Codex — навык + MCP-сервер + правило в <code>~/.codex/AGENTS.md</code>",
     disconnect: "Отключить", doConnect: "Подключить", isConnected: "подключён", notConnected: "не подключён",
-    connState: (c, x) => `Claude Code: ${c} · Codex: ${x}`, noServer: "Нет связи с локальным сервером.", working: "Выполняю…", done: "готово",
+    connState: (c, x, g) => `Claude Code: ${c} · Codex: ${x} · Gemini CLI: ${g}`, noServer: "Нет связи с локальным сервером.", working: "Выполняю…", done: "готово",
+    connGemini: "Gemini CLI — MCP-сервер + правило в <code>~/.gemini/GEMINI.md</code>",
     staticConnectTitle: "Выполните `pmap connect` в терминале (статичный файл не может менять настройки)",
     staticConnect: "Это статичный снимок карты. Чтобы подключить агентов, выполните в терминале:\n\n  pmap connect --claude\n\n(или запустите install.sh / install.bat)",
     projHead: "Проект", projNow: "Сейчас открыт:", projOther: "Открыть другой проект",
@@ -1036,15 +1039,15 @@ async function refreshConnection() {
   try {
     const st = await api("api/connection");
     const fmt = (x) => x.connected ? `<b style="color:var(--usedby)">${t("isConnected")}</b>` : t("notConnected");
-    $("connState").innerHTML = t("connState", fmt(st.claude), fmt(st.codex));
-    const on = st.claude.connected || st.codex.connected;
+    $("connState").innerHTML = t("connState", fmt(st.claude), fmt(st.codex), fmt(st.gemini || {}));
+    const on = st.claude.connected || st.codex.connected || (st.gemini && st.gemini.connected);
     $("connectBtn").dataset.t = on ? "connected" : "connect"; $("connectBtn").textContent = t($("connectBtn").dataset.t);
   } catch (err) { $("connState").textContent = t("noServer"); }
 }
 async function connect(action) {
   $("connRes").style.display = "block"; $("connRes").textContent = t("working");
   try {
-    const res = await api("api/" + action, { claude: $("cClaude").checked, codex: $("cCodex").checked });
+    const res = await api("api/" + action, { claude: $("cClaude").checked, codex: $("cCodex").checked, gemini: $("cGemini").checked });
     $("connRes").textContent = (res.report || []).join("\n") || res.error || t("done");
   } catch (err) { $("connRes").textContent = String(err); }
   refreshConnection();

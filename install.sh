@@ -1,10 +1,10 @@
 #!/bin/sh
 # Method Project Map installer for macOS and Linux.
 #   ./install.sh            install the `pmap` command and connect Claude Code
-#   ./install.sh --codex    ... connect Codex instead      ./install.sh --all   both
+#   ./install.sh --codex    ... connect Codex instead (--gemini: Gemini CLI)   ./install.sh --all   every agent
 #   ./install.sh --none     only install the `pmap` command
 #   add --python-only to skip the grammars for TypeScript/JavaScript, Go, Java, Kotlin and C# (downloaded from PyPI)
-# Everything goes under ~/.pmap (and, when connecting, ~/.claude or ~/.codex). Undo: ~/.pmap/bin/pmap disconnect --all
+# Everything goes under ~/.pmap (and, when connecting, ~/.claude, ~/.codex or ~/.gemini). Undo: ~/.pmap/bin/pmap disconnect --all
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # the newest Python 3 available: maps are parsed with its grammar

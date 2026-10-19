@@ -115,7 +115,7 @@ cd method-project-map
 ## Для ИИ-агентов
 
 ```bash
-pmap connect --claude      # или --codex, --all; отменить: pmap disconnect --all
+pmap connect --claude      # или --codex, --gemini, --all; отменить: pmap disconnect --all
 ```
 
 Команда ставит навык и правило, а для Claude Code ещё и хук `SessionStart`: он передаёт агенту обзор проекта. Кроме того, подключается MCP-сервер с инструментами `pmap_overview`, `pmap_find`, `pmap_show`, `pmap_source`, `pmap_check`, `pmap_stale` и `pmap_scan`. Каждое изменение — помеченный блок с резервной копией.
