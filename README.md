@@ -121,6 +121,7 @@ Agents that were only *told* about the map almost never used it, so the overview
 
 - **User guide**: [English](docs/guide.en.md) · [Русский](docs/guide.ru.md). Covers installation, reading the map, `design.yaml`, AI agents, every command and troubleshooting.
 - **Agent protocol**: [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md). Describes how agents get and use the map.
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md).
 - **Map format (PMF 0.2)**: [spec/PMF-v0.md](spec/PMF-v0.md) and the [JSON Schema](spec/pmf-v0.schema.json).
 
 ## How it works

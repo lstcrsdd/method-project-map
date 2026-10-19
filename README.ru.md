@@ -121,6 +121,7 @@ pmap connect --claude      # или --codex, --all; отменить: pmap disco
 
 - **Руководство пользователя**: [Русский](docs/guide.ru.md) · [English](docs/guide.en.md). Установка, чтение карты, `design.yaml`, ИИ-агенты, все команды и решение проблем.
 - **Протокол для агентов**: [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md). Как агенты получают карту и пользуются ею.
+- **История изменений**: [CHANGELOG.md](CHANGELOG.md) (на английском).
 - **Формат карты (PMF 0.2)**: [spec/PMF-v0.md](spec/PMF-v0.md) и [JSON Schema](spec/pmf-v0.schema.json).
 
 ## Как это работает
