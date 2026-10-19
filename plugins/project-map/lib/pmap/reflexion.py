@@ -118,6 +118,8 @@ class ReflexionReport:
     unmapped_modules: list[str] = field(default_factory=list)
     node_to_subsystem: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    # Readable names next to ids in the text report; filled for designs whose ids say little (mDm).
+    labels: dict[str, str] = field(default_factory=dict)
 
     @property
     def is_clean(self) -> bool:
@@ -139,6 +141,7 @@ class ReflexionReport:
             "divergences": [d.to_dict() for d in self.divergences],
             "absences": [a.to_dict() for a in self.absences],
             "unmapped_modules": list(self.unmapped_modules),
+            **({"labels": dict(self.labels)} if self.labels else {}),
         }
 
 
@@ -233,7 +236,7 @@ def check_reflexion(design: DesignMap, actual: ActualMap, include_type_only: boo
                     evidence=actual_pairs[pair],
                 )
             )
-        else:
+        elif dep.required:
             absences.append(
                 SubsystemRelationResult(
                     from_subsystem=pair[0],
@@ -255,7 +258,7 @@ def check_reflexion(design: DesignMap, actual: ActualMap, include_type_only: boo
                 )
             )
 
-    warnings: list[str] = []
+    warnings: list[str] = list(design.notes)
     if actual.errors:
         warnings.append(
             f"{len(actual.errors)} file(s) could not be analysed and are absent from the check: "
@@ -283,11 +286,19 @@ def check_reflexion(design: DesignMap, actual: ActualMap, include_type_only: boo
         unmapped_modules=sorted(unmapped_modules),
         node_to_subsystem=node_to_subsystem,
         warnings=warnings,
+        labels={s.id: s.name for s in design.subsystems} if design.source == "mdm" else {},
     )
 
 
 def format_reflexion_text(report: ReflexionReport) -> str:
     """Format a human- and agent-readable summary of the ReflexionReport."""
+
+    def named(rel: SubsystemRelationResult) -> str:
+        if not report.labels:
+            return ""
+        return f" [{report.labels.get(rel.from_subsystem, rel.from_subsystem)} -> " \
+               f"{report.labels.get(rel.to_subsystem, rel.to_subsystem)}]"
+
     lines: list[str] = [
         f"Reflexion Report for project '{report.project_name}'",
         "=" * 54,
@@ -307,7 +318,7 @@ def format_reflexion_text(report: ReflexionReport) -> str:
     if report.divergences:
         lines.append("[!] DIVERGENCES (Architectural Violations):")
         for div in report.divergences:
-            lines.append(f"  ✗ {div.from_subsystem} -> {div.to_subsystem} ({len(div.evidence)} violation(s))")
+            lines.append(f"  ✗ {div.from_subsystem} -> {div.to_subsystem}{named(div)} ({len(div.evidence)} violation(s))")
             for ev in div.evidence:
                 loc_str = f"{ev.path}:{ev.line}" if ev.path and ev.line else (ev.path or "unknown")
                 lines.append(f"      - [{ev.kind}] {ev.from_node} -> {ev.to_node} at {loc_str}")
@@ -329,7 +340,7 @@ def format_reflexion_text(report: ReflexionReport) -> str:
     if report.absences:
         lines.append("[-] ABSENCES (Allowed in Design, Unused in Code):")
         for ab in report.absences:
-            lines.append(f"  - {ab.from_subsystem} -.-> {ab.to_subsystem}")
+            lines.append(f"  - {ab.from_subsystem} -.-> {ab.to_subsystem}{named(ab)}")
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"

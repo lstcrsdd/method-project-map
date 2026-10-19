@@ -146,7 +146,11 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
 
 
 def load_design_map(path: str | Path) -> DesignMap:
-    """Load a DesignMap from a YAML or JSON file."""
+    """Load a DesignMap from a YAML or JSON file, or derive it from an mDm scheme (`*.mdm`)."""
+    if Path(path).suffix.lower() == ".mdm":
+        from pmap.mdm import load_mdm_design
+
+        return load_mdm_design(Path(path))
     text = Path(path).read_text(encoding="utf-8")
     data = parse_simple_yaml(text)
     errors = validate_pmf_document(data)
@@ -224,6 +228,8 @@ def validate_pmf_document(doc: dict[str, Any], schema_path: str | Path | None = 
                     errors.append(f"allowed_dependencies[{idx}].from must be a non-empty string")
                 if not isinstance(dep.get("to"), str) or not dep.get("to"):
                     errors.append(f"allowed_dependencies[{idx}].to must be a non-empty string")
+                if "required" in dep and not isinstance(dep["required"], bool):
+                    errors.append(f"allowed_dependencies[{idx}].required must be a boolean")
 
     if kind in ("actual", "combined"):
         gen_at = doc.get("generated_at")

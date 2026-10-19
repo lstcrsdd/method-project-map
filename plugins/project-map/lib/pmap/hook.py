@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 PROJECT_MARKERS = (".git", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", ".pmap", "design.yaml",
-                   "package.json", "tsconfig.json", "go.mod", "pom.xml", "build.gradle", "build.gradle.kts",
+                   "PROJECT.mdm", "package.json", "tsconfig.json", "go.mod", "pom.xml", "build.gradle", "build.gradle.kts",
                    "settings.gradle", "settings.gradle.kts", "Cargo.toml", "pubspec.yaml", "Package.swift",
                    "CMakeLists.txt", "meson.build", "Makefile")
 PROJECT_SUFFIXES = (".sln", ".csproj", ".vcxproj", ".xcodeproj", ".xcworkspace")

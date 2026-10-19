@@ -208,7 +208,13 @@ def format_agent_context(
         header_lines.append(
             f"[NOT MAPPED] {len(unreadable)} unparsable file(s): " + ", ".join(e.path for e in unreadable[:5])
         )
-    if report is not None:
+    if design is not None and design.source == "mdm":
+        # The mDm scheme is the design: the agent sees which function lives where before reading code.
+        header_lines.append("Scheme (mDm, PROJECT.mdm): functions and objects linked to code with `код:`")
+        for sub in design.subsystems:
+            header_lines.append(f"- {sub.name} ({sub.id}): {', '.join(sub.paths)}")
+        header_lines.extend(f"[mDm] {note}" for note in design.notes)
+    if report is not None and design is not None and design.subsystems:
         header_lines.append(
             f"Architecture status: {len(report.convergences)} convergences, "
             f"{len(report.divergences)} divergences, {len(report.absences)} absences"

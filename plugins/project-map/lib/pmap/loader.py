@@ -12,7 +12,8 @@ from pmap.scanner import ProjectScanner
 from pmap.stale import is_map_fresh
 from pmap.yaml_loader import load_design_map
 
-DESIGN_CANDIDATES = ("design.yaml", ".pmap/design.yaml", "pmap.design.yaml")
+# design.yaml wins; without one, an mDm scheme with `код:` lines is the design (pmap/mdm.py).
+DESIGN_CANDIDATES = ("design.yaml", ".pmap/design.yaml", "pmap.design.yaml", "PROJECT.mdm")
 
 
 def load_map(repo_root: Path, warn: bool = True) -> ActualMap:

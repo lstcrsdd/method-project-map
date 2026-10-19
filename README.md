@@ -132,6 +132,10 @@ The benchmark was run with Codex on a 29,000-line project, with hidden tests the
 
 Agents that were only *told* about the map almost never used it, so the overview is delivered at the start of the session. Reports: [bench/reports](bench/reports).
 
+## With mDm
+
+[mDm](https://method-network.com/) is the functional-scheme editor of the same Method Network. The scheme it hands to a coding agent (`PROJECT.mdm`) works as this map's design: the agent adds a `код:` line with paths to each function, and `pmap check .` compares the wiring in the code with the wiring on the scheme. The agent's overview starts with the functions and where they live. Details: [the guide](docs/guide.en.md#an-mdm-scheme-instead-of-designyaml).
+
 ## Documentation
 
 - **User guide**: [English](docs/guide.en.md) · [Русский](docs/guide.ru.md). Covers installation, reading the map, `design.yaml`, AI agents, every command and troubleshooting.

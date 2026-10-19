@@ -64,6 +64,8 @@ A file path or a qualified name also works.
 
 If `design.yaml` exists, run `pmap check .`. A new *divergence* means a dependency the design does not allow. Fix it unless the task is to change the architecture.
 
+A project designed in mDm has `PROJECT.mdm`; without `design.yaml` it is the design (spec section 4.1). After building a function, record where it lives: a `код: <paths>` line under the function (` · код: <paths>` on an object), or the mDm MCP tool `set_code`. Then `pmap check .`. A divergence there means the code wires together what the scheme keeps apart: fix the code; if the scheme is what is wrong, record a question for its author (a `G… ?` line or the mDm tool `add_gap`) instead of editing the scheme.
+
 ## 6. Installation footprint
 
 `pmap connect` writes only these:

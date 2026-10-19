@@ -234,10 +234,15 @@ class SubsystemSpec:
 
 @dataclass
 class AllowedDependencySpec:
-    """Allowed architectural dependency between two subsystems."""
+    """Allowed architectural dependency between two subsystems.
+
+    `required: false` only permits the dependency: the check does not report it as an absence when the
+    code has none (used for links that may go either way, as in a design derived from an mDm scheme).
+    """
     from_subsystem: str
     to_subsystem: str
     description: str = ""
+    required: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         res: dict[str, Any] = {
@@ -246,6 +251,8 @@ class AllowedDependencySpec:
         }
         if self.description:
             res["description"] = self.description
+        if not self.required:
+            res["required"] = False
         return res
 
 
@@ -257,6 +264,10 @@ class DesignMap:
     project_description: str = ""
     subsystems: list[SubsystemSpec] = field(default_factory=list)
     allowed_dependencies: list[AllowedDependencySpec] = field(default_factory=list)
+    # Where the design came from ("yaml" for design.yaml, "mdm" for PROJECT.mdm) and what the loader
+    # could not use; both stay out of the PMF document.
+    source: str = "yaml"
+    notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         proj: dict[str, Any] = {"name": self.project_name}
@@ -287,6 +298,7 @@ class DesignMap:
                 from_subsystem=d["from"],
                 to_subsystem=d["to"],
                 description=d.get("description", ""),
+                required=d.get("required", True) is not False,
             )
             for d in data.get("allowed_dependencies", [])
         ]

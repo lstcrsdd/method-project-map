@@ -32,6 +32,8 @@ Use plain text search as well when a symptom names literal strings, config keys 
 
 If the repository has a `design.yaml`, run `{{PMAP}} check .` and fix any new *divergence* (a dependency the design does not allow) unless the task is to change the architecture.
 
+A project designed in mDm has a `PROJECT.mdm` (functions, the objects they take and give). Without `design.yaml` it is the design: after building a function, write `код: <paths>` under it (or call the mDm MCP tool `set_code`), then `{{PMAP}} check .`. A divergence means the code wires together what the scheme keeps apart; fix the code, or record a question for the scheme's author (`G… ?` line / `add_gap`) rather than editing the scheme.
+
 ## For people
 
 `{{PMAP}} ui .` opens an interactive block-diagram of the project in the browser; `{{PMAP}} html . -o map.html` writes it as one shareable file.

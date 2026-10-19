@@ -63,10 +63,11 @@ TOOLS = [
     },
     {
         "name": "pmap_check",
-        "description": "Compare code dependencies with the design map (design.yaml): convergences, divergences "
-                       "(architecture violations), absences.",
+        "description": "Compare code dependencies with the design map (design.yaml, or an mDm scheme PROJECT.mdm "
+                       "with `код:` lines): convergences, divergences (architecture violations), absences.",
         "inputSchema": {"type": "object", "properties": {
-            "repo": _REPO, "design": {"type": "string", "description": "Path to design.yaml (auto-detected)"},
+            "repo": _REPO,
+            "design": {"type": "string", "description": "Path to design.yaml or PROJECT.mdm (auto-detected)"},
             "include_type_only": {"type": "boolean"},
         }},
     },
@@ -136,7 +137,7 @@ class PmapServer:
         root = self.repo(args)
         actual, design = self.cache.get_with_design(root, args.get("design"))
         if design is None:
-            return "No design map found (design.yaml, .pmap/design.yaml); nothing to check against.\n"
+            return "No design map found (design.yaml, .pmap/design.yaml, PROJECT.mdm); nothing to check against.\n"
         report = check_reflexion(design, actual, include_type_only=bool(args.get("include_type_only")))
         return format_reflexion_text(report)
 

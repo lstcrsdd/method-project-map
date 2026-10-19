@@ -212,6 +212,11 @@
         },
         "description": {
           "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "true: the code must have this dependency (an absence is reported). false: the dependency is only permitted."
         }
       },
       "additionalProperties": false

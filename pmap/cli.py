@@ -63,7 +63,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo).resolve()
     design = _auto_find_design(repo_root, args.design)
     if design is None:
-        print("Error: design map not found. Pass --design <path/to/design.yaml>.", file=sys.stderr)
+        print("Error: design map not found (design.yaml or PROJECT.mdm). Pass --design <path>.", file=sys.stderr)
         return 2
 
     actual = _load_or_scan_actual(repo_root)
@@ -264,9 +264,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_scan.set_defaults(func=cmd_scan)
 
-    p_check = subparsers.add_parser("check", help="Compare actual code dependencies against design.yaml")
+    p_check = subparsers.add_parser("check", help="Compare actual code dependencies against design.yaml or PROJECT.mdm")
     p_check.add_argument("repo", help="Path to the repository root")
-    p_check.add_argument("--design", "-d", required=False, help="Path to design.yaml")
+    p_check.add_argument("--design", "-d", required=False, help="Path to design.yaml or an mDm PROJECT.mdm")
     p_check.add_argument("--json", action="store_true", help="Output report as JSON")
     p_check.add_argument("--strict", action="store_true", help="Exit with code 1 if divergences exist")
     p_check.add_argument(
@@ -285,7 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="subsystem",
         help="Granularity level: 'subsystem' or 'module'",
     )
-    p_mermaid.add_argument("--design", "-d", required=False, help="Optional path to design.yaml")
+    p_mermaid.add_argument("--design", "-d", required=False, help="Optional path to design.yaml or PROJECT.mdm")
     p_mermaid.set_defaults(func=cmd_mermaid)
 
     p_stale = subparsers.add_parser("stale", help="List nodes whose underlying files changed since last scan")
@@ -295,7 +295,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_context = subparsers.add_parser("context", help="Generate compact size-bounded text context for an AI agent")
     p_context.add_argument("repo", help="Path to the repository root")
-    p_context.add_argument("--design", "-d", required=False, help="Optional path to design.yaml")
+    p_context.add_argument("--design", "-d", required=False, help="Optional path to design.yaml or PROJECT.mdm")
     p_context.add_argument("--max-chars", type=int, default=4000, help="Maximum character budget")
     p_context.set_defaults(func=cmd_context)
 
@@ -322,7 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_serve = subparsers.add_parser("serve", help="Open the interactive map in a local web UI")
     p_serve.add_argument("repo", nargs="?", default=".", help="Repository root (default: current directory)")
-    p_serve.add_argument("--design", "-d", help="Optional path to design.yaml")
+    p_serve.add_argument("--design", "-d", help="Optional path to design.yaml or PROJECT.mdm")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8765)
     p_serve.add_argument("--open", action="store_true", help="Open the browser")
@@ -340,7 +340,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_html = subparsers.add_parser("html", help="Export the interactive map as one self-contained HTML file")
     p_html.add_argument("repo", nargs="?", default=".", help="Repository root (default: current directory)")
     p_html.add_argument("--output", "-o", default="project-map.html")
-    p_html.add_argument("--design", "-d", help="Optional path to design.yaml")
+    p_html.add_argument("--design", "-d", help="Optional path to design.yaml or PROJECT.mdm")
     p_html.set_defaults(func=cmd_html)
 
     for name, helptext in (("connect", "Give Claude Code / Codex access to project maps (skill, hook, MCP)"),

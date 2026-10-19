@@ -238,6 +238,19 @@ Only confirmed links count. Imports made only for type checking (`if TYPE_CHECKI
 
 A working example lives in [`examples/`](../examples): `pmap serve examples/toy_project --design examples/design.yaml --open` shows one deliberate violation (`ui → db`).
 
+### An mDm scheme instead of design.yaml
+
+A project designed in [mDm](https://method-network.com/) has `PROJECT.mdm` in its root: a functional scheme of functions and the objects they take (`из:`) and give (`в:`). Once a function is built, the coding agent writes under it where it lives:
+
+```text
+2 Подобрать слот
+  из: Заявка, Расписание мастера
+  в: Бронь
+  код: app/booking/slots/
+```
+
+Without a `design.yaml` the map checks the code against this scheme (`pmap check .`, or explicitly `pmap check . --design PROJECT.mdm`). Functions and objects with `код:` become subsystems. Whatever the scheme wires together is allowed: a function uses its objects; functions joined by an object, and a function with its subfunctions, use each other. Anything else is a violation: a wire in the code that the scheme does not have. Functions without `код:` are listed in a warning. Details: [the specification](../spec/PMF-v0.md), section 4.1.
+
 ## 6. AI agents
 
 Agents waste much of their context reading files just to find their way. Method Project Map gives them the map instead.
