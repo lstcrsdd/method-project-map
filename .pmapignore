@@ -2,3 +2,4 @@
 plugins/*/lib/
 bench/corpora/
 bench/hidden_tests/
+tests/fixtures/

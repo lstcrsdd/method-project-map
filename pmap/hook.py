@@ -1,6 +1,6 @@
 """Agent hooks. `pmap hook session-start` gives a new Claude Code session an overview of the project.
 
-The hook must never get in the way: outside Python projects, in the home folder, on huge trees or on
+The hook must never get in the way: outside code projects, in the home folder, on huge trees or on
 any error it prints nothing and exits 0.
 """
 
@@ -12,7 +12,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-PROJECT_MARKERS = (".git", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", ".pmap", "design.yaml")
+PROJECT_MARKERS = (".git", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", ".pmap", "design.yaml",
+                   "package.json", "tsconfig.json", "go.mod", "pom.xml", "build.gradle", "build.gradle.kts",
+                   "settings.gradle", "settings.gradle.kts")
+PROJECT_SUFFIXES = (".sln", ".csproj")
 SKIP_DIRS = {".git", ".venv", "venv", "env", "node_modules", "__pycache__", ".pmap", "dist", "build", ".tox", ".mypy_cache"}
 MAX_PY_FILES = 6000
 CONTEXT_CHARS = 7500
@@ -32,29 +35,46 @@ def project_root(start: Path) -> Optional[Path]:
     for candidate in [current, *current.parents]:
         if candidate == home or candidate == Path(candidate.anchor):
             break
-        if any((candidate / marker).exists() for marker in PROJECT_MARKERS):
+        if any((candidate / marker).exists() for marker in PROJECT_MARKERS) or _has_suffix(candidate):
             return candidate
-    # no project marker: a folder that directly holds Python packages is a project too
+    # no project marker: a folder that directly holds Python packages is a project too (other languages
+    # always come with a marker: package.json, go.mod, pom.xml, build.gradle, *.csproj)
     if current != home and current != Path(current.anchor) and _has_python_package(current):
         return current
     return None
 
 
-def count_python_files(root: Path, limit: int) -> int:
+def _has_suffix(folder: Path) -> bool:
+    try:
+        return any(child.suffix in PROJECT_SUFFIXES for child in folder.iterdir())
+    except OSError:
+        return False
+
+
+def count_source_files(root: Path, limit: int, mapped_only: bool = False) -> int:
+    """Python files plus files of the other supported languages (only those whose grammar is installed, if asked)."""
+    from pmap import langs
+
+    exts = {".py"} | {ext for lang, spec in langs.LANGUAGES.items() for ext in spec["exts"]
+                      if not mapped_only or langs.available(lang)}
     count = 0
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith("._")]
-        count += sum(1 for f in filenames if f.endswith(".py") and not f.startswith("._"))
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS | langs.SKIP_DIRS and not d.startswith("._")]
+        count += sum(1 for f in filenames if os.path.splitext(f)[1] in exts and not f.startswith("._"))
         if count > limit:
             break
     return count
+
+
+def count_python_files(root: Path, limit: int) -> int:  # kept for callers of earlier versions
+    return count_source_files(root, limit)
 
 
 def session_start_context(cwd: Path) -> Optional[str]:
     root = project_root(cwd)
     if root is None:
         return None
-    files = count_python_files(root, MAX_PY_FILES)
+    files = count_source_files(root, MAX_PY_FILES, mapped_only=True)
     if files == 0:
         return None
     from pmap.connect import launcher_path
@@ -62,12 +82,12 @@ def session_start_context(cwd: Path) -> Optional[str]:
     launcher = launcher_path()
     cmd = str(launcher) if launcher.exists() else "pmap"
     header = (
-        f"Method Project Map (pmap) — static map of this Python repository ({root.name}), for orientation before reading "
+        f"Method Project Map (pmap) — static map of this repository ({root.name}), for orientation before reading "
         f"files. Details on demand: `{cmd} find <name>`, `{cmd} show <node-id|path>`, `{cmd} source <node-id>` "
         "(or the pmap_* MCP tools). `resolved` links are proven; verify `inferred` ones. Skill: project-map.\n\n"
     )
     if files > MAX_PY_FILES:
-        return header + f"(Large repository: more than {MAX_PY_FILES} Python files; run `{cmd} context .` when needed.)"
+        return header + f"(Large repository: more than {MAX_PY_FILES} source files; run `{cmd} context .` when needed.)"
     from pmap.loader import find_design, load_map
     from pmap.mermaid import format_agent_context
 

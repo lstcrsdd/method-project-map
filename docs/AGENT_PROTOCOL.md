@@ -12,9 +12,11 @@ Benchmarks showed that agents almost never call map tools on their own. With the
 | Codex | rule in `~/.codex/AGENTS.md`: run `pmap context` at task start | `pmap connect --codex` |
 | Any agent | `pmap context <repo> --max-chars 8000` or MCP `pmap_overview` | — |
 
-The hook acts only in Python projects, which it recognises in two ways:
-- a project marker (`.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `design.yaml`, `.pmap`);
+The hook acts only in code projects, which it recognises in two ways:
+- a project marker (`.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `package.json`, `tsconfig.json`, `go.mod`, `pom.xml`, `build.gradle(.kts)`, `settings.gradle(.kts)`, `*.sln`, `*.csproj`, `design.yaml`, `.pmap`);
 - or a folder that directly contains a Python package.
+
+Languages besides Python (TypeScript / JavaScript, Go, Java, Kotlin, C#) are on the map when their tree-sitter grammars are installed (`pmap langs install`); the overview names any language that is not.
 
 It stays silent in the home folder, outside projects, and on any error. Output is kept under Claude Code's 10,000-character limit.
 
@@ -43,9 +45,9 @@ Within each level, the most widely used code comes first. A final line says what
 The MCP tools take an optional `repo`. It defaults to `$PMAP_REPO`, then `$CLAUDE_PROJECT_DIR`, then the server's working directory. Pass it explicitly when the server's working directory is not the project, as with Codex plugins.
 
 Node ids look like this:
-- `mod:<package.module>` for a module;
-- `sym:<package.module>:<Name>` for a class or function;
-- `sym:<package.module>:<Class>.<method>` for a method.
+- `mod:<package.module>` for a Python module, `mod:<file path>` for a file in another language;
+- `sym:<package.module>:<Name>` / `sym:<file path>:<Name>` for a class or function;
+- `sym:<package.module>:<Class>.<method>` / `sym:<file path>:<Class>.<method>` for a method.
 
 A file path or a qualified name also works.
 

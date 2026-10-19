@@ -1,4 +1,4 @@
-"""Static scanner that builds an ActualMap from Python files.
+"""Static scanner that builds an ActualMap from Python files (other languages: pmap.langs).
 
 Confidence rules (spec/PMF-v0.md, section 2):
   resolved   — exactly one possible target, proven from the analysed code alone;
@@ -145,17 +145,20 @@ def discover_python_files(repo_root: Path, roots: list[str] | None = None) -> li
     roots = roots or ["."]
     ignore = load_ignore_patterns(repo_root)
     results: list[tuple[Path, str, str]] = []
-    for path in sorted(repo_root.rglob("*.py")):
-        rel_parts = path.relative_to(repo_root).parts
+    # os.walk prunes ignored folders instead of descending into them (node_modules can hold 100k files)
+    for dirpath, dirnames, filenames in os.walk(repo_root):
         # macOS stores resource-fork metadata in binary AppleDouble sidecars.
-        if any(part.startswith("._") for part in rel_parts) or not path.is_file():
-            continue
-        if any(part in _IGNORED_DIRS or part.startswith(".pmap") for part in rel_parts):
-            continue
-        rel_posix = path.relative_to(repo_root).as_posix()
-        if ignore and is_ignored(rel_posix, ignore):
-            continue
-        results.append((path, rel_posix, _module_name_for(rel_posix, roots)))
+        dirnames[:] = [d for d in dirnames if d not in _IGNORED_DIRS and not d.startswith("._")
+                       and not d.startswith(".pmap")]
+        for name in filenames:
+            if not name.endswith(".py") or name.startswith("._"):
+                continue
+            path = Path(dirpath) / name
+            rel_posix = path.relative_to(repo_root).as_posix()
+            if ignore and is_ignored(rel_posix, ignore):
+                continue
+            results.append((path, rel_posix, _module_name_for(rel_posix, roots)))
+    results.sort(key=lambda item: item[1])
     return results
 
 
@@ -390,17 +393,30 @@ class ProjectScanner:
                     for call in child.scope.calls:
                         self._process_call(meth_id, replace(ctx, nested=call.nested), call, parsed.rel_path)
 
+        # TypeScript / JavaScript, Go, Java, Kotlin, C# (tree-sitter, optional); one project may mix them with Python
+        from pmap import langs
+
+        others = langs.scan(root_path, load_ignore_patterns(root_path))
+        for node in others.nodes:
+            nodes_by_id.setdefault(node.id, node)
+        languages = {}
+        python_files = len(self.modules) + sum(1 for e in errors if e.path.endswith(".py"))
+        if python_files:
+            languages["python"] = {"files": python_files, "mapped": True}
+        languages.update(others.languages)
+
         sorted_nodes = sorted(nodes_by_id.values(), key=lambda n: (n.external, n.id))
         return ActualMap(
             pmf_version=PMF_VERSION,
             generated_at=timestamp,
             repo_root=root_path.name,
-            scanner_name="pmap-python-ast",
+            scanner_name="pmap",
             scanner_version=__version__,
             nodes=sorted_nodes,
-            edges=self._edges,
+            edges=self._edges + others.edges,
             import_roots=roots,
-            errors=errors,
+            errors=errors + others.errors,
+            languages=languages,
         )
 
     @staticmethod

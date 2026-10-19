@@ -30,7 +30,7 @@ from pmap.web import desktop
 STATIC = Path(__file__).resolve().parent / "static"
 _DEP_KINDS = ("imports", "calls", "inherits")
 _POST_PATHS = ("/api/connect", "/api/disconnect", "/api/open", "/api/pick", "/api/reveal")
-MAX_PROJECT_FILES = 20000  # a folder with more Python files than this is not one project (home, a disk)
+MAX_PROJECT_FILES = 20000  # a folder with more source files than this is not one project (home, a disk)
 IDLE_EXIT = 15 * 60  # `pmap ui` stops this long after the last request from an open page (the page polls every 4 s)
 
 
@@ -96,6 +96,7 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
         "nodes": nodes,
         "edges": edges,
         "errors": [e.to_dict() for e in actual.errors],
+        "languages": actual.languages,
         "design": None,
     }
     if report is not None and design is not None:
@@ -168,7 +169,7 @@ class ProjectFolderError(ValueError):
 
 def check_project_folder(raw: str) -> Path:
     """The folder the user asked to open, or ProjectFolderError."""
-    from pmap.hook import count_python_files
+    from pmap.hook import count_source_files
 
     if not raw or not raw.strip():
         raise ProjectFolderError("empty", "empty path")
@@ -180,11 +181,11 @@ def check_project_folder(raw: str) -> Path:
         raise ProjectFolderError("not_dir", f"not a folder: {path}")
     if path == Path.home().resolve() or path == Path(path.anchor):
         raise ProjectFolderError("too_wide", "that is your home folder or a whole disk; choose one project folder")
-    files = count_python_files(path, MAX_PROJECT_FILES)
+    files = count_source_files(path, MAX_PROJECT_FILES)
     if files == 0:
-        raise ProjectFolderError("no_python", f"no Python files in {path}")
+        raise ProjectFolderError("no_python", f"no source files (Python, TypeScript, JavaScript, Go, Java, Kotlin, C#) in {path}")
     if files > MAX_PROJECT_FILES:
-        raise ProjectFolderError("too_wide", f"more than {MAX_PROJECT_FILES} Python files in {path}")
+        raise ProjectFolderError("too_wide", f"more than {MAX_PROJECT_FILES} source files in {path}")
     return path
 
 

@@ -93,7 +93,17 @@ def find_unscanned_files(repo_root: str | Path, actual: ActualMap) -> list[str]:
     known_paths = {n.location.path for n in actual.nodes if n.location is not None}
     error_hashes = {e.path: e.file_hash for e in actual.errors}
     result: list[str] = []
-    for abs_path, rel_posix, _mod in discover_python_files(root, actual.import_roots):
+    candidates = [(abs_path, rel) for abs_path, rel, _mod in discover_python_files(root, actual.import_roots)]
+    from pmap import langs
+    from pmap.scanner import load_ignore_patterns
+
+    ready: dict[str, bool] = {}
+    for abs_path, rel, language in langs.discover(root, load_ignore_patterns(root)):
+        if language not in ready:
+            ready[language] = langs.available(language)
+        if ready[language]:  # without its grammar a language cannot be on the map, so it is not "missing"
+            candidates.append((abs_path, rel))
+    for abs_path, rel_posix in candidates:
         if rel_posix in known_paths:
             continue
         if rel_posix in error_hashes and error_hashes[rel_posix] == compute_file_hash(abs_path):
@@ -103,7 +113,12 @@ def find_unscanned_files(repo_root: str | Path, actual: ActualMap) -> list[str]:
 
 
 def is_map_fresh(repo_root: str | Path, actual: ActualMap) -> bool:
-    """True if every mapped file is unchanged and no Python file is missing from the map."""
+    """True if every mapped file is unchanged, no source file is missing and no new grammar became available."""
+    from pmap import langs
+
+    for language, info in actual.languages.items():
+        if not info.get("mapped") and language in langs.LANGUAGES and langs.available(language):
+            return False
     return not check_stale_nodes(repo_root, actual) and not find_unscanned_files(repo_root, actual)
 
 

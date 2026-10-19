@@ -5,12 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "method-project-map"
 version = "0.2.0"
-description = "Method Project Map — a static, LLM-free map of Python projects for people and AI coding agents"
+description = "Method Project Map — a static, LLM-free map of codebases (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#) for people and AI coding agents"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "lstcrsdd" }]
 requires-python = ">=3.9"
 dependencies = []
+
+[project.optional-dependencies]
+# TypeScript / JavaScript, Go, Java, Kotlin, C# (Python needs nothing)
+langs = ["tree-sitter>=0.22", "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-go", "tree-sitter-java",
+         "tree-sitter-kotlin", "tree-sitter-c-sharp"]
 keywords = ["architecture", "code map", "static analysis", "ai agents", "mcp", "reflexion model"]
 classifiers = [
     "Programming Language :: Python :: 3",

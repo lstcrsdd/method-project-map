@@ -208,6 +208,28 @@ def cmd_disconnect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_langs(args: argparse.Namespace) -> int:
+    from pmap import langs
+
+    if args.action == "install":
+        from pmap.connect import install_languages
+
+        try:
+            for line in install_languages():
+                print(line)
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print("Done. Reopen the map (or start a new agent session) to see the other languages.")
+        return 0
+    print("Python: built in")
+    for key, spec in langs.LANGUAGES.items():
+        print(f"{spec['name']}: {'ready' if langs.available(key) else 'not installed'}  ({', '.join(spec['exts'])})")
+    if not all(langs.available(key) for key in langs.LANGUAGES):
+        print("\nAdd the missing grammars with:  pmap langs install")
+    return 0
+
+
 def cmd_connection(args: argparse.Namespace) -> int:
     from pmap.connect import status
 
@@ -324,6 +346,10 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--codex", action="store_true", help="OpenAI Codex")
         p.add_argument("--all", action="store_true", help="Both agents")
         p.set_defaults(func=cmd_connect if name == "connect" else cmd_disconnect)
+
+    p_langs = subparsers.add_parser("langs", help="Languages besides Python: show what is installed, or install it")
+    p_langs.add_argument("action", nargs="?", choices=["status", "install"], default="status")
+    p_langs.set_defaults(func=cmd_langs)
 
     p_conn = subparsers.add_parser("connection", help="Show which agents are connected")
     p_conn.set_defaults(func=cmd_connection)

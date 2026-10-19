@@ -1,0 +1,4 @@
+{
+  // aliases, like most real projects
+  "compilerOptions": { "baseUrl": ".", "paths": { "@core/*": ["src/core/*"] }, },
+}

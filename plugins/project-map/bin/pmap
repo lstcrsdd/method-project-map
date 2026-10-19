@@ -1,6 +1,8 @@
 #!/bin/sh
 # Method Project Map CLI bundled with the plugin; Claude Code puts this directory on the Bash tool's PATH.
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PY="$(command -v python3 || command -v python)"
+# ~/.pmap/venv (from `pmap langs install`) carries the grammars for languages besides Python
+PY="$HOME/.pmap/venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3 || command -v python)"
 if [ -z "$PY" ]; then echo "pmap: Python 3.9+ is required" >&2; exit 1; fi
 exec "$PY" -I -c "import sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='pmap';from pmap.cli import main;sys.exit(main())" "$DIR/lib" "$@"

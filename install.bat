@@ -2,6 +2,7 @@
 rem Method Project Map installer for Windows.
 rem   install.bat            install the pmap command and connect Claude Code
 rem   install.bat --codex    connect Codex instead;   --all   both;   --none   only the pmap command
+rem   add --python-only to skip the grammars for TypeScript/JavaScript, Go, Java, Kotlin and C# (from PyPI)
 rem Undo:  "%USERPROFILE%\.pmap\bin\pmap.cmd" disconnect --all
 setlocal
 set "HERE=%~dp0"
@@ -17,14 +18,19 @@ exit /b 1
 :havepy
 %PY% -c "import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)"
 if errorlevel 1 goto oldpy
-set "MODE=%~1"
-if "%MODE%"=="" set "MODE=--claude"
+set "MODE=--claude"
+set "LANGS=1"
+for %%A in (%*) do (
+  if /i "%%~A"=="--python-only" (set "LANGS=0") else (set "MODE=%%~A")
+)
 if "%MODE%"=="--none" goto runtime
 %PY% -I -c "import sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='pmap';from pmap.cli import main;sys.exit(main())" "%HERE%." connect %MODE%
 goto done
 :runtime
 %PY% -I -c "import sys; sys.path.insert(0, sys.argv[1]); from pmap.connect import install_runtime; print('Installed:', install_runtime())" "%HERE%."
 :done
+if "%LANGS%"=="1" %PY% -I -c "import sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='pmap';from pmap.cli import main;sys.exit(main())" "%HERE%." langs install
+if errorlevel 1 echo (Languages besides Python were skipped; add them later with: pmap langs install)
 %PY% -I -c "import sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='pmap';from pmap.cli import main;sys.exit(main())" "%HERE%." shortcut
 echo.
 echo Done. Open Method Project Map from the Start menu, or run:  "%USERPROFILE%\.pmap\bin\pmap.cmd" ui

@@ -132,6 +132,25 @@ class TestConnect(SandboxHome):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("usage: pmap", result.stdout)
 
+    def test_language_grammars_go_to_their_own_environment(self) -> None:
+        calls = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            if cmd[1:3] == ["-m", "venv"]:  # pretend the environment was created
+                python = agents.venv_python()
+                python.parent.mkdir(parents=True, exist_ok=True)
+                python.write_text("")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        with mock.patch.object(agents.subprocess, "run", side_effect=fake_run):
+            report = agents.install_languages(log=lambda *_: None)
+        self.assertEqual(calls[0][1:3], ["-m", "venv"])
+        self.assertIn("tree-sitter-typescript", calls[1])
+        self.assertTrue(any("Runtime" in line for line in report))
+        if os.name != "nt":  # the launcher now runs on the environment's Python
+            self.assertIn(str(agents.venv_python()), agents.launcher_path().read_text())
+
     def test_existing_unmanaged_codex_server_is_left_alone(self) -> None:
         codex = self.home / ".codex"
         codex.mkdir()

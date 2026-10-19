@@ -18,7 +18,7 @@ from pmap import __version__  # noqa: E402
 from pmap.connect import BOOTSTRAP  # noqa: E402
 
 PLUGIN = ROOT / "plugins" / "project-map"
-DESCRIPTION = ("Static, LLM-free map of a Python repository: packages, modules, classes, functions and the links between "
+DESCRIPTION = ("Static, LLM-free map of a codebase (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#): packages, files, classes, functions and the links between "
                "them, for agents (overview at session start, find/show/source tools) and people (interactive web view).")
 
 
@@ -41,7 +41,9 @@ def build() -> Path:
     write(PLUGIN / "bin" / "pmap", f"""#!/bin/sh
 # Method Project Map CLI bundled with the plugin; Claude Code puts this directory on the Bash tool's PATH.
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PY="$(command -v python3 || command -v python)"
+# ~/.pmap/venv (from `pmap langs install`) carries the grammars for languages besides Python
+PY="$HOME/.pmap/venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3 || command -v python)"
 if [ -z "$PY" ]; then echo "pmap: Python 3.9+ is required" >&2; exit 1; fi
 exec "$PY" -I -c "{BOOTSTRAP}" "$DIR/lib" "$@"
 """, 0o755)
@@ -49,6 +51,7 @@ exec "$PY" -I -c "{BOOTSTRAP}" "$DIR/lib" "$@"
           "set \"PMAP_LIB=%~dp0..\\lib\"\r\n"
           "where py >nul 2>nul\r\n"
           "if errorlevel 1 (set \"PMAP_PY=python\") else (set \"PMAP_PY=py -3\")\r\n"
+          "if exist \"%USERPROFILE%\\.pmap\\venv\\Scripts\\python.exe\" set \"PMAP_PY=\"%USERPROFILE%\\.pmap\\venv\\Scripts\\python.exe\"\"\r\n"
           f"%PMAP_PY% -I -c \"{BOOTSTRAP}\" \"%PMAP_LIB%\" %*\r\n")
 
     skill = (ROOT / "pmap" / "agent" / "SKILL.md").read_text(encoding="utf-8").replace("{{PMAP}}", "pmap")

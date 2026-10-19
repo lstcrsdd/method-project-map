@@ -245,7 +245,7 @@ def validate_pmf_document(doc: dict[str, Any], schema_path: str | Path | None = 
             for idx, err in enumerate(scan_errors):
                 if not isinstance(err, dict) or not isinstance(err.get("path"), str) or not err.get("path"):
                     errors.append(f"errors[{idx}].path must be a non-empty string")
-                elif err.get("kind") not in ("syntax_error", "decode_error", "duplicate_module"):
+                elif err.get("kind") not in ("syntax_error", "decode_error", "duplicate_module", "partial_parse"):
                     errors.append(f"errors[{idx}].kind invalid: {err.get('kind')!r}")
 
         nodes = doc.get("nodes")

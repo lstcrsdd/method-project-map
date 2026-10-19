@@ -9,6 +9,7 @@ set "PY="
 where py >nul 2>nul
 if not errorlevel 1 set "PY=py -3"
 if not defined PY set "PY=python"
+if exist "%USERPROFILE%\.pmap\venv\Scripts\python.exe" set PY="%USERPROFILE%\.pmap\venv\Scripts\python.exe"
 %PY% -I -c "import sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='pmap';from pmap.cli import main;sys.exit(main())" "%HERE%." ui %*
 if errorlevel 1 pause
 endlocal

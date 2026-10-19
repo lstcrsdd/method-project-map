@@ -245,7 +245,7 @@ const L = {
     mermaidHead: "Mermaid for this view", copy: "Copy", copied: "Copied", close: "Close",
     helpHead: "Method Project Map — guide",
     connHead: "Connect project maps to your AI agents",
-    connText: "Installs the Method Project Map skill and, for Claude Code, a session-start hook that hands Claude an overview of every Python project it opens. Only files under your home folder are changed, with backups; “Disconnect” removes everything again.",
+    connText: "Installs the Method Project Map skill and, for Claude Code, a session-start hook that hands Claude an overview of every code project it opens. Only files under your home folder are changed, with backups; “Disconnect” removes everything again.",
     checking: "Checking…",
     connClaude: "Claude Code — skill + overview at every session start + MCP tools when the <code>claude</code> CLI is available",
     connCodex: "Codex — skill + MCP server + a rule in <code>~/.codex/AGENTS.md</code>",
@@ -260,7 +260,7 @@ const L = {
     projWaiting: { mac: "Choose a folder in the Finder window…", windows: "Choose a folder in the Explorer window…", linux: "Choose a folder in the dialog…" }, projScanning: "Reading the project…", projCancelled: "No folder chosen.",
     projStatic: "This page is a static export of one project. To browse other projects run:\n\n  pmap serve <folder> --open",
     err_empty: () => "Type a folder path first.", err_relative: () => "Use a full path, e.g. /Users/me/code/project or C:\\code\\project.",
-    err_not_dir: (p) => `Not a folder: ${p}`, err_no_python: (p) => `No Python files in ${p}.`,
+    err_not_dir: (p) => `Not a folder: ${p}`, err_no_python: (p) => `No source files (Python, TypeScript, JavaScript, Go, Java, Kotlin, C#) in ${p}.`,
     err_too_wide: () => "That is too wide (a home folder, a disk or thousands of projects). Choose one project folder.",
     showIn: { mac: "Show in Finder", windows: "Show in Explorer", linux: "Open folder" },
     all: "All", topLayer: "Top layer <span>— uses the layers below; nothing here is used by them</span>",
@@ -297,6 +297,8 @@ const L = {
     unreadable: (n) => `Files the map could not read (${n})`, startHere: "Start here",
     startText: "The cards are the packages of your code, stacked in layers: the top layer is where things start (entry points, wiring), the bottom one is the foundation. Click any card to see its links. Press <b>?</b> for a short guide.",
     fileKind: "file", noMatch: "no match", noData: "No map data.",
+    languagesH: "Languages", notMapped: "not on the map",
+    notMappedHint: "These languages need the optional grammars: run <code>pmap langs install</code>, then reopen the map.",
   },
   ru: {
     search: "Найти класс, функцию или файл  ( / )", viewTitle: "Что показывает обзор", viewPkg: "Пакеты", viewDesign: "Архитектура",
@@ -308,7 +310,7 @@ const L = {
     mermaidHead: "Mermaid для этого вида", copy: "Копировать", copied: "Скопировано", close: "Закрыть",
     helpHead: "Method Project Map — справочник",
     connHead: "Подключить карты проектов к ИИ-агентам",
-    connText: "Устанавливает навык Method Project Map, а для Claude Code ещё и хук начала сессии: Claude получает обзор каждого Python-проекта, который открывает. Меняются только файлы в вашей домашней папке, с резервными копиями; «Отключить» убирает всё обратно.",
+    connText: "Устанавливает навык Method Project Map, а для Claude Code ещё и хук начала сессии: Claude получает обзор каждого проекта с кодом, который открывает. Меняются только файлы в вашей домашней папке, с резервными копиями; «Отключить» убирает всё обратно.",
     checking: "Проверяю…",
     connClaude: "Claude Code — навык + обзор в начале каждой сессии + MCP-инструменты, если установлен CLI <code>claude</code>",
     connCodex: "Codex — навык + MCP-сервер + правило в <code>~/.codex/AGENTS.md</code>",
@@ -323,7 +325,7 @@ const L = {
     projWaiting: { mac: "Выберите папку в окне Finder…", windows: "Выберите папку в окне Проводника…", linux: "Выберите папку в окне выбора…" }, projScanning: "Читаю проект…", projCancelled: "Папка не выбрана.",
     projStatic: "Эта страница — статичный снимок одного проекта. Чтобы открывать другие проекты, запустите:\n\n  pmap serve <папка> --open",
     err_empty: () => "Сначала введите путь к папке.", err_relative: () => "Нужен полный путь, например /Users/me/code/project или C:\\code\\project.",
-    err_not_dir: (p) => `Это не папка: ${p}`, err_no_python: (p) => `В папке нет Python-файлов: ${p}`,
+    err_not_dir: (p) => `Это не папка: ${p}`, err_no_python: (p) => `В папке нет файлов с кодом (Python, TypeScript, JavaScript, Go, Java, Kotlin, C#): ${p}`,
     err_too_wide: () => "Слишком широко (домашняя папка, диск целиком или тысячи проектов). Выберите папку одного проекта.",
     showIn: { mac: "Показать в Finder", windows: "Показать в Проводнике", linux: "Открыть папку" },
     all: "Все", topLayer: "Верхний слой <span>— пользуется слоями ниже; его самого никто не использует</span>",
@@ -360,6 +362,8 @@ const L = {
     unreadable: (n) => `Файлы, которые карта не смогла прочитать (${n})`, startHere: "С чего начать",
     startText: "Карточки — это пакеты вашего кода, разложенные по слоям: наверху то, с чего всё начинается (точки входа, сборка), внизу — фундамент. Нажмите на любую карточку, чтобы увидеть её связи. Клавиша <b>?</b> — короткая справка.",
     fileKind: "файл", noMatch: "ничего не найдено", noData: "Нет данных карты.",
+    languagesH: "Языки", notMapped: "не на карте",
+    notMappedHint: "Для этих языков нужны дополнительные грамматики: выполните <code>pmap langs install</code> и откройте карту заново.",
   },
 };
 Object.assign(L.en, {
@@ -377,24 +381,25 @@ Object.assign(L.en, {
     search: { t: "Search", b: "Type the name of a class, function or file. Press / anywhere to jump here." },
     maybe: { t: "Possible links", b: "By default the map shows only links proven from the code. Turn this on to also see likely ones (dashed) and check those in the code." },
     design: { t: "Architecture", b: "This project has a design.yaml: switch to Architecture to see which dependencies the design allows and where the code breaks the rules." },
-    connect: { t: "Connect your AI", b: "Gives Claude Code / Codex a map of every Python project they open, so they read less code to find their way. One click to connect, one to disconnect." },
+    connect: { t: "Connect your AI", b: "Gives Claude Code / Codex a map of every code project they open, so they read less code to find their way. One click to connect, one to disconnect." },
     lang: { t: "Language", b: "Switch between English and Russian." },
     help: { t: "Help is always here", b: "The full reference and this tour live behind this button. That's all — enjoy the map!" },
   },
   ref: [
-    { id: "what", t: "What this is", h: "<p>Method Project Map draws the structure of a Python project from its source code: packages, files, classes, functions and the links between them — who imports, calls or inherits whom. No AI is involved: the map is computed, so it is the same every time and refreshes itself when files change.</p><p>It answers questions like “where does this start?”, “what breaks if I change this file?”, “who calls this function?”.</p>" },
+    { id: "what", t: "What this is", h: "<p>Method Project Map draws the structure of a project from its source code (Python, TypeScript / JavaScript, Go, Java, Kotlin, C#): packages, files, classes, functions and the links between them — who imports, calls or inherits whom. No AI is involved: the map is computed, so it is the same every time and refreshes itself when files change.</p><p>It answers questions like “where does this start?”, “what breaks if I change this file?”, “who calls this function?”.</p>" },
+    { id: "langs", t: "Languages", h: "<p><b>Python</b> works out of the box. <b>TypeScript / JavaScript</b> (ES modules, CommonJS, JSX, tsconfig aliases, monorepo packages), <b>Go</b>, <b>Java</b>, <b>Kotlin</b> and <b>C#</b> use tree-sitter grammars: run <code>pmap langs install</code> once (the installer does it for you). One project may mix languages; the project panel lists them and says which are not on the map yet.</p><p>The same confidence rules apply everywhere. Calls through a variable or field of a project type are <i>possible</i> links (the object may be a subclass), except in Go, where methods of concrete types are exact. Calls into libraries get no edge: the import already records that dependency.</p>" },
     { id: "levels", t: "Three levels", h: "<p><b>Overview</b> — every card is a package (a folder of code). <b>Package</b> — every card is a file of that package. <b>File</b> — three columns: who uses the file, what is inside it, what it uses.</p><ul><li><b>Click</b> a card to select it and see its links.</li><li><b>Double-click</b> it or press <b>Open</b> to go inside.</li><li>The path at the top, <code>Esc</code> or <code>Backspace</code> take you one level up.</li><li>The <b>Files</b> tree on the left jumps straight to any package, file, class or function.</li></ul>" },
     { id: "layers", t: "Layers", h: "<p>Cards are stacked by dependency. The <b>top layer</b> uses the layers below and nothing uses it: entry points, command line, tests. The <b>foundation</b> at the bottom depends on nothing in view: models, utilities, the core everything is built on. Layers in between build on the ones under them.</p><p>If code at the bottom suddenly uses code at the top, the design is usually worth a closer look.</p>" },
     { id: "colors", t: "Arrows and colours", h: "<ul><li><span style='color:var(--uses)'>Blue</span> — what the selected item uses.</li><li><span style='color:var(--usedby)'>Green</span> — what uses the selected item.</li><li>A card with a <span style='color:var(--warn)'>red</span> frame both uses the selection and is used by it (a cycle).</li><li>Dashed amber — a possible link (see below).</li><li>In the Architecture view: green — allowed and used, red — not allowed, dotted — allowed but unused.</li></ul><p>Arrows are drawn only for the selected card, so the picture stays readable. Click an empty spot to clear the selection.</p>" },
     { id: "trust", t: "Confirmed and possible links", h: "<ul><li><span class='pill ok'>confirmed</span> — proven from the code, for example a direct import or a call of an imported function. You can rely on it.</li><li><span class='pill maybe'>possible</span> — likely but not proven: a call through a typed parameter, a method a subclass may override, a variable assigned in several places. Hidden by default; turn on <b>Possible links</b> to see them.</li><li><b>Calls the map could not resolve</b> are listed in the side panel. The map says nothing about them: read the code.</li></ul><p>The map cannot see calls made from code outside the repository, functions replaced at run time (monkey-patching) or lookups by name with <code>getattr</code>.</p>" },
     { id: "panel", t: "Side panel and search", h: "<p>The right panel describes the selection: what it is (from its docstring), its signature, what it contains, what it uses and who uses it, with line numbers. Buttons: <b>Open</b>, <b>Show source</b> (just that function or class, not the whole file) and <b>Show in Finder / Explorer</b>.</p><p><b>Search</b> (<code>/</code>) finds classes, functions, methods and files by name; <code>↑ ↓</code> choose a result, <code>Enter</code> opens it.</p>" },
-    { id: "projects", t: "Projects", h: "<p>Click the project name at the top left: choose a folder in Finder / Explorer, paste a full path, or pick a recent project. Any folder with Python files works; a home folder or a whole disk is refused.</p><p>To leave generated or third-party (vendored) code out of the map, put a <code>.pmapignore</code> file in the project root: one pattern per line, <code>folder/</code> skips a whole folder, <code>#</code> starts a comment.</p>" },
+    { id: "projects", t: "Projects", h: "<p>Click the project name at the top left: choose a folder in Finder / Explorer, paste a full path, or pick a recent project. Any folder with source code works; a home folder or a whole disk is refused.</p><p>To leave generated or third-party (vendored) code out of the map, put a <code>.pmapignore</code> file in the project root: one pattern per line, <code>folder/</code> skips a whole folder, <code>#</code> starts a comment.</p>" },
     { id: "design", t: "Architecture (design.yaml)", h: "<p>Describe the intended architecture in <code>design.yaml</code> in the project root: the subsystems (which folders belong to each) and which subsystem may use which. The <b>Architecture</b> view then checks the real code against it and shows every forbidden dependency with the file and line it comes from.</p><pre class='src'>subsystems:\n  - id: ui\n    name: User interface\n    paths: ['app/ui/**']\n  - id: services\n    name: Business logic\n    paths: ['app/services/**']\n  - id: db\n    name: Database\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Here a call from <code>ui</code> straight into <code>db</code> shows up in red. In a terminal: <code>pmap check .</code>; add <code>--strict</code> to fail a CI job on violations.</p>" },
     { id: "ai", t: "Connecting AI agents", h: "<p><b>Connect to AI</b> gives Claude Code and/or Codex access to project maps: a skill, a rule, the MCP tools and, for Claude Code, a hook that hands the agent a short overview of the project at the start of every session. In our tests the agent read half as much code with the same quality of fixes.</p><p>Only files in your home folder are changed, each with a backup; <b>Disconnect</b> removes everything again. In a terminal: <code>pmap connect --claude</code>, <code>--codex</code> or <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
     { id: "launch", t: "Starting and stopping", h: "<ul><li>The <b>Method Project Map</b> shortcut (Applications on macOS, the Start menu on Windows, the app menu on Linux) or <code>pmap ui</code> opens the last project; the very first time it asks for a folder.</li><li>Starting it again opens the map that is already running.</li><li>The map stops by itself about 15 minutes after its tab is closed. If the page says “stopped”, start Method Project Map again.</li><li>The status at the top right: <b>live</b> — the map follows file changes; <b>static file</b> — a saved snapshot made by <code>pmap html</code>.</li></ul>" },
     { id: "keys", t: "Keys", h: "<ul><li><code>/</code> — search</li><li><code>Esc</code>, <code>Backspace</code> — one level up, close a window</li><li><code>↑ ↓ Enter</code> — choose and open a search result</li><li>In the tour: <code>→</code> next, <code>←</code> back, <code>Esc</code> end</li></ul>" },
     { id: "cli", t: "Command line", h: "<pre class='src'>pmap ui [folder]                open the map: the last project, or choose one\npmap html [folder] -o map.html  save the map as one self-contained page\npmap scan .                     save the map to .pmap/actual.json\npmap context .                  a short overview for an AI agent\npmap find NAME                  where a class or function is\npmap show REF                   one item: location, links, users\npmap source REF                 the code of one function or class\npmap check .                    compare the code with design.yaml\npmap stale .                    what changed since the last scan\npmap connect | disconnect       AI agents\npmap shortcut [--remove]        the Method Project Map app shortcut</pre>" },
-    { id: "trouble", t: "If something goes wrong", h: "<ul><li><b>“stopped — open Method Project Map again”</b> — the map stopped after its tab stayed closed or idle; start it again.</li><li><b>“No Python files”</b> — choose the project folder itself, not the folder above or next to it.</li><li><b>macOS asks for access to files</b> — allow it once: the shortcut needs to read the project folder, especially on an external disk.</li><li><b>A file is missing from the map</b> — look under “Files the map could not read” in the project panel (a syntax error) or check <code>.pmapignore</code>.</li><li><b>An expected link is missing</b> — turn on <b>Possible links</b>; calls through variables or <code>getattr</code> may stay unresolved.</li></ul>" },
+    { id: "trouble", t: "If something goes wrong", h: "<ul><li><b>“stopped — open Method Project Map again”</b> — the map stopped after its tab stayed closed or idle; start it again.</li><li><b>“No source files”</b> — choose the project folder itself, not the folder above or next to it.</li><li><b>macOS asks for access to files</b> — allow it once: the shortcut needs to read the project folder, especially on an external disk.</li><li><b>A file is missing from the map</b> — look under “Files the map could not read” in the project panel (a syntax error) or check <code>.pmapignore</code>.</li><li><b>An expected link is missing</b> — turn on <b>Possible links</b>; calls through variables or <code>getattr</code> may stay unresolved.</li></ul>" },
   ],
 });
 Object.assign(L.ru, {
@@ -412,26 +417,28 @@ Object.assign(L.ru, {
     search: { t: "Поиск", b: "Введите имя класса, функции или файла. Клавиша / в любом месте переносит сюда." },
     maybe: { t: "Возможные связи", b: "По умолчанию карта показывает только связи, доказанные по коду. Включите, чтобы видеть и вероятные (пунктиром), — их стоит проверить в коде." },
     design: { t: "Архитектура", b: "У этого проекта есть design.yaml: переключитесь на «Архитектуру», чтобы увидеть, какие зависимости разрешены замыслом и где код нарушает правила." },
-    connect: { t: "Подключите ИИ", b: "Даёт Claude Code / Codex карту каждого Python-проекта, который они открывают, — чтобы им приходилось читать меньше кода. Подключается одним нажатием и так же отключается." },
+    connect: { t: "Подключите ИИ", b: "Даёт Claude Code / Codex карту каждого проекта с кодом, который они открывают, — чтобы им приходилось читать меньше кода. Подключается одним нажатием и так же отключается." },
     lang: { t: "Язык", b: "Переключение между русским и английским." },
     help: { t: "Справка всегда здесь", b: "Полный справочник и это обучение — за этой кнопкой. Вот и всё, приятной работы с картой!" },
   },
   ref: [
-    { id: "what", t: "Что это", h: "<p>Method Project Map рисует устройство Python-проекта по его исходному коду: пакеты, файлы, классы, функции и связи между ними — кто кого импортирует, вызывает, от кого наследуется. ИИ здесь не участвует: карта вычисляется, поэтому всегда одинакова и сама обновляется, когда меняются файлы.</p><p>Она отвечает на вопросы «откуда всё начинается?», «что сломается, если поменять этот файл?», «кто вызывает эту функцию?».</p>" },
+    { id: "what", t: "Что это", h: "<p>Method Project Map рисует устройство проекта по его исходному коду (Python, TypeScript / JavaScript, Go, Java, Kotlin, C#): пакеты, файлы, классы, функции и связи между ними — кто кого импортирует, вызывает, от кого наследуется. ИИ здесь не участвует: карта вычисляется, поэтому всегда одинакова и сама обновляется, когда меняются файлы.</p><p>Она отвечает на вопросы «откуда всё начинается?», «что сломается, если поменять этот файл?», «кто вызывает эту функцию?».</p>" },
+    { id: "langs", t: "Языки", h: "<p><b>Python</b> работает сразу. Для <b>TypeScript / JavaScript</b> (ES-модули, CommonJS, JSX, алиасы tsconfig, пакеты монорепозитория), <b>Go</b>, <b>Java</b>, <b>Kotlin</b> и <b>C#</b> нужны грамматики tree-sitter: один раз выполните <code>pmap langs install</code> (установщик делает это сам). В одном проекте языки можно смешивать; панель проекта показывает их и говорит, какие ещё не на карте.</p><p>Правила уверенности везде одинаковые. Вызов через переменную или поле с типом из проекта — <i>возможная</i> связь (объект может оказаться подклассом); исключение — Go, где методы конкретных типов вызываются точно. У вызовов в библиотеки связей нет: зависимость уже записана импортом.</p>" },
     { id: "levels", t: "Три уровня", h: "<p><b>Обзор</b> — каждая карточка это пакет (папка с кодом). <b>Пакет</b> — каждая карточка это файл пакета. <b>Файл</b> — три колонки: кто использует файл, что в нём, что использует он.</p><ul><li><b>Клик</b> по карточке выбирает её и показывает связи.</li><li><b>Двойной клик</b> или кнопка <b>Открыть</b> — зайти внутрь.</li><li>Путь вверху, <code>Esc</code> или <code>Backspace</code> — на уровень выше.</li><li>Дерево <b>Файлы</b> слева сразу открывает любой пакет, файл, класс или функцию.</li></ul>" },
     { id: "layers", t: "Слои", h: "<p>Карточки разложены по зависимостям. <b>Верхний слой</b> пользуется слоями ниже, а его самого никто не использует: точки входа, командная строка, тесты. <b>Фундамент</b> внизу ни от чего на экране не зависит: модели, утилиты, ядро, на котором всё построено. Промежуточные слои опираются на те, что под ними.</p><p>Если код снизу вдруг пользуется кодом сверху, к архитектуре обычно стоит присмотреться.</p>" },
     { id: "colors", t: "Стрелки и цвета", h: "<ul><li><span style='color:var(--uses)'>Синие</span> — что использует выбранное.</li><li><span style='color:var(--usedby)'>Зелёные</span> — кто использует выбранное.</li><li>Карточка в <span style='color:var(--warn)'>красной</span> рамке и использует выбранное, и используется им (цикл).</li><li>Жёлтый пунктир — возможная связь (см. ниже).</li><li>В виде «Архитектура»: зелёным — разрешено и используется, красным — не разрешено, точками — разрешено, но не используется.</li></ul><p>Стрелки рисуются только для выбранной карточки, чтобы картинка оставалась читаемой. Клик по пустому месту снимает выбор.</p>" },
     { id: "trust", t: "Подтверждённые и возможные связи", h: "<ul><li><span class='pill ok'>подтверждена</span> — доказана по коду, например прямой импорт или вызов импортированной функции. На неё можно полагаться.</li><li><span class='pill maybe'>возможна</span> — вероятна, но не доказана: вызов через параметр с аннотацией типа, метод, который может переопределить подкласс, переменная, которой присваивают в нескольких местах. По умолчанию скрыты — включите <b>Возможные связи</b>.</li><li><b>Вызовы, которые карта не смогла определить</b>, перечислены в боковой панели. О них карта ничего не утверждает: смотрите код.</li></ul><p>Карта не видит вызовов из кода вне репозитория, подмены функций на лету (monkey-patching) и обращений по имени через <code>getattr</code>.</p>" },
     { id: "panel", t: "Боковая панель и поиск", h: "<p>Правая панель описывает выбранное: что это (из docstring), сигнатура, что внутри, что оно использует и кто использует его — с номерами строк. Кнопки: <b>Открыть</b>, <b>Показать код</b> (только эта функция или класс, а не весь файл) и <b>Показать в Finder / Проводнике</b>.</p><p><b>Поиск</b> (<code>/</code>) находит классы, функции, методы и файлы по имени; <code>↑ ↓</code> — выбрать результат, <code>Enter</code> — открыть.</p>" },
-    { id: "projects", t: "Проекты", h: "<p>Нажмите на название проекта слева вверху: выберите папку в Finder / Проводнике, вставьте полный путь или возьмите проект из недавних. Подойдёт любая папка с Python-файлами; домашнюю папку или диск целиком карта не откроет.</p><p>Чтобы убрать с карты сгенерированный или чужой (вендорный) код, положите в корень проекта файл <code>.pmapignore</code>: по шаблону на строку, <code>папка/</code> исключает папку целиком, <code>#</code> начинает комментарий.</p>" },
+    { id: "projects", t: "Проекты", h: "<p>Нажмите на название проекта слева вверху: выберите папку в Finder / Проводнике, вставьте полный путь или возьмите проект из недавних. Подойдёт любая папка с кодом; домашнюю папку или диск целиком карта не откроет.</p><p>Чтобы убрать с карты сгенерированный или чужой (вендорный) код, положите в корень проекта файл <code>.pmapignore</code>: по шаблону на строку, <code>папка/</code> исключает папку целиком, <code>#</code> начинает комментарий.</p>" },
     { id: "design", t: "Архитектура (design.yaml)", h: "<p>Опишите задуманную архитектуру в файле <code>design.yaml</code> в корне проекта: подсистемы (какие папки к ним относятся) и какая подсистема может пользоваться какой. Вид <b>Архитектура</b> сверит с этим настоящий код и покажет каждую запрещённую зависимость вместе с файлом и строкой, откуда она взялась.</p><pre class='src'>subsystems:\n  - id: ui\n    name: Интерфейс\n    paths: ['app/ui/**']\n  - id: services\n    name: Бизнес-логика\n    paths: ['app/services/**']\n  - id: db\n    name: База данных\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Здесь вызов из <code>ui</code> напрямую в <code>db</code> будет показан красным. В терминале: <code>pmap check .</code>; с <code>--strict</code> проверка в CI упадёт при нарушениях.</p>" },
     { id: "ai", t: "Подключение ИИ-агентов", h: "<p><b>Подключить к ИИ</b> даёт Claude Code и/или Codex доступ к картам проектов: навык, правило, MCP-инструменты, а для Claude Code ещё и хук, который в начале каждой сессии передаёт агенту краткий обзор проекта. В наших испытаниях агент читал вдвое меньше кода, а качество исправлений не изменилось.</p><p>Меняются только файлы в вашей домашней папке, у каждого есть резервная копия; <b>Отключить</b> убирает всё обратно. В терминале: <code>pmap connect --claude</code>, <code>--codex</code> или <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
     { id: "launch", t: "Запуск и остановка", h: "<ul><li>Ярлык <b>Method Project Map</b> («Программы» на macOS, меню «Пуск» на Windows, меню приложений на Linux) или команда <code>pmap ui</code> открывает последний проект; в самый первый раз спросит папку.</li><li>Повторный запуск открывает уже работающую карту.</li><li>Карта сама останавливается примерно через 15 минут после того, как закрыли её вкладку. Если на странице написано «остановлена», просто запустите Method Project Map снова.</li><li>Статус справа вверху: <b>онлайн</b> — карта следит за изменениями файлов; <b>файл-снимок</b> — сохранённая копия, сделанная командой <code>pmap html</code>.</li></ul>" },
     { id: "keys", t: "Клавиши", h: "<ul><li><code>/</code> — поиск</li><li><code>Esc</code>, <code>Backspace</code> — на уровень выше, закрыть окно</li><li><code>↑ ↓ Enter</code> — выбрать и открыть результат поиска</li><li>В обучении: <code>→</code> далее, <code>←</code> назад, <code>Esc</code> завершить</li></ul>" },
     { id: "cli", t: "Командная строка", h: "<pre class='src'>pmap ui [папка]                 открыть карту: последний проект или выбрать\npmap html [папка] -o map.html   сохранить карту одной самодостаточной страницей\npmap scan .                     сохранить карту в .pmap/actual.json\npmap context .                  краткий обзор для ИИ-агента\npmap find ИМЯ                   где находится класс или функция\npmap show ССЫЛКА                один элемент: где, связи, кто использует\npmap source ССЫЛКА              код одной функции или класса\npmap check .                    сверить код с design.yaml\npmap stale .                    что изменилось после последнего скана\npmap connect | disconnect       ИИ-агенты\npmap shortcut [--remove]        ярлык Method Project Map</pre>" },
-    { id: "trouble", t: "Если что-то не так", h: "<ul><li><b>«остановлена — запустите Method Project Map снова»</b> — карта остановилась, потому что её вкладка была закрыта или долго не отвечала; запустите её снова.</li><li><b>«В папке нет Python-файлов»</b> — выберите саму папку проекта, а не ту, что выше или рядом.</li><li><b>macOS спрашивает доступ к файлам</b> — разрешите один раз: ярлыку нужно читать папку проекта, особенно на внешнем диске.</li><li><b>Файла нет на карте</b> — посмотрите раздел «Файлы, которые карта не смогла прочитать» в панели проекта (ошибка синтаксиса) или проверьте <code>.pmapignore</code>.</li><li><b>Нет ожидаемой связи</b> — включите <b>Возможные связи</b>; вызовы через переменные или <code>getattr</code> могут остаться неопределёнными.</li></ul>" },
+    { id: "trouble", t: "Если что-то не так", h: "<ul><li><b>«остановлена — запустите Method Project Map снова»</b> — карта остановилась, потому что её вкладка была закрыта или долго не отвечала; запустите её снова.</li><li><b>«В папке нет файлов с кодом»</b> — выберите саму папку проекта, а не ту, что выше или рядом.</li><li><b>macOS спрашивает доступ к файлам</b> — разрешите один раз: ярлыку нужно читать папку проекта, особенно на внешнем диске.</li><li><b>Файла нет на карте</b> — посмотрите раздел «Файлы, которые карта не смогла прочитать» в панели проекта (ошибка синтаксиса) или проверьте <code>.pmapignore</code>.</li><li><b>Нет ожидаемой связи</b> — включите <b>Возможные связи</b>; вызовы через переменные или <code>getattr</code> могут остаться неопределёнными.</li></ul>" },
   ],
 });
+const LANG_NAMES = { python: "Python", typescript: "TypeScript", javascript: "JavaScript", go: "Go", java: "Java", kotlin: "Kotlin", csharp: "C#" };
 function t(key, ...args) { const v = key in L[LANG] ? L[LANG][key] : L.en[key]; return typeof v === "function" ? v(...args) : v; }
 const tp = (key) => t(key)[(PROJ && PROJ.platform) || "linux"];  // phrases that name Finder / Explorer
 
@@ -459,11 +466,7 @@ function buildIndex(data, withMaybe) {
   const pkgs = new Map();
   for (const n of data.nodes) if (n.k === "module" && !n.x && n.g !== undefined) { if (!pkgs.has(n.g)) pkgs.set(n.g, []); pkgs.get(n.g).push(n.id); }
   for (const l of pkgs.values()) l.sort((a, b) => byId.get(a).f.localeCompare(byId.get(b).f));
-  // the common top folder (e.g. "tallyhub/") is dropped from package labels
-  const counts = new Map();
-  for (const p of pkgs.keys()) { const f = p.split("/")[0]; counts.set(f, (counts.get(f) || 0) + 1); }
-  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const top = best && best[1] > pkgs.size / 2 && [...pkgs.keys()].some((p) => p.startsWith(best[0] + "/")) ? best[0] : null;
+  const labels = packageLabels([...pkgs.keys()]);
   const pkgDoc = new Map();
   for (const [p, mods] of pkgs) { const init = mods.map((m) => byId.get(m)).find((m) => m.f.endsWith("__init__.py")); if (init && init.d) pkgDoc.set(p, init.d); }
   const pkgOf = (id) => { const m = byId.get(modOf.get(id)); return m && !m.x && m.g !== undefined ? m.g : null; };
@@ -488,13 +491,45 @@ function buildIndex(data, withMaybe) {
     if (ps !== pt && ps !== undefined && pt !== undefined && !link.y) { add(pkgDeps, ps, pt, link); add(pkgUsers, pt, ps, link); }
   }
   const membership = (data.design && data.design.membership) || {};
-  return { byId, kids, modOf, pkgs, top, pkgDoc, pkgOf, out, inc, modDeps, modUsers, pkgDeps, pkgUsers, membership };
+  return { byId, kids, modOf, pkgs, labels, pkgDoc, pkgOf, out, inc, modDeps, modUsers, pkgDeps, pkgUsers, membership };
+}
+
+// Short package labels: drop the folder most packages share ("tallyhub/"), Java/Kotlin source roots
+// ("src/main/java/") and a prefix every label then shares ("com/acme/"), as long as labels stay unique.
+const SOURCE_ROOTS = new Set(["src", "main", "java", "kotlin", "scala"]);
+function packageLabels(names) {
+  const counts = new Map();
+  for (const p of names) { const f = p.split("/")[0]; counts.set(f, (counts.get(f) || 0) + 1); }
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const top = best && best[1] > names.length / 2 && names.some((p) => p.startsWith(best[0] + "/")) ? best[0] : null;
+  const plain = new Map(), short = new Map();
+  for (const p of names) {
+    if (p === "." || p === top) continue;
+    let s = p.split("/");
+    if (top && s[0] === top) s = s.slice(1);
+    plain.set(p, s.join("/"));
+    let k = 0;
+    while (k < s.length - 1 && SOURCE_ROOTS.has(s[k])) k++;
+    short.set(p, s.slice(k));
+  }
+  const rest = [...short.values()];
+  let m = 0;
+  if (rest.length > 1) while (rest.every((s) => s.length > m + 1 && s[m] === rest[0][m])) m++;
+  const tidy = new Map([...short].map(([p, s]) => [p, s.slice(m).join("/")]));
+  const unique = new Set(tidy.values()).size === tidy.size;
+  const labels = new Map();
+  for (const p of names) {
+    if (p === ".") labels.set(p, { text: null, root: false });
+    else if (p === top) labels.set(p, { text: top, root: true });
+    else labels.set(p, { text: (unique ? tidy : plain).get(p), root: false });
+  }
+  return labels;
 }
 
 function pkgLabel(p) {
-  if (IX.top && p === IX.top) return p + t("rootSuffix");
-  if (IX.top && p.startsWith(IX.top + "/")) return p.slice(IX.top.length + 1);
-  return p === "." ? t("topLevel") : p;
+  const l = IX.labels.get(p);
+  if (!l || l.text === null) return p === "." ? t("topLevel") : p;
+  return l.root ? l.text + t("rootSuffix") : l.text;
 }
 function modLabel(id) { const n = IX.byId.get(id); return n && n.f ? n.f.split("/").pop() : (n ? n.q : id); }
 function isEmptyInit(id) { const n = IX.byId.get(id); return n.f.endsWith("__init__.py") && !(IX.kids.get(id) || []).length && !IX.modDeps.has(id); }
@@ -925,6 +960,10 @@ function overview() {
   if (DATA.design) { const d = DATA.design;
     h += `<h3>${t("designCheck")}</h3><div class="list"><div><span class="pill ok">${t("allowedUsedN", d.convergences.length)}</span><span class="pill warn">${t("notAllowedCount", d.divergences.length)}</span><span class="pill">${t("unusedN", d.absences.length)}</span></div>` +
       d.divergences.map((x) => `<div class="warn">${esc(x[0])} → ${esc(x[1])} (${t("nLinks", x[2])})</div>`).join("") + d.warnings.map((w) => `<div class="muted">${esc(w)}</div>`).join("") + "</div>"; }
+  const langs = Object.entries(DATA.languages || {});
+  if (langs.length) h += `<h3>${t("languagesH")}</h3><div class="list">` + langs.sort((a, b) => b[1].files - a[1].files).map(([k, v]) =>
+    `<div>${esc(LANG_NAMES[k] || k)} <span class="ln">${pl(v.files, "file")}</span>${v.mapped ? "" : ` <span class="pill warn">${t("notMapped")}</span>`}</div>`).join("") +
+    (langs.some(([, v]) => !v.mapped) ? `<div class="muted">${t("notMappedHint")}</div>` : "") + "</div>";
   if (DATA.errors.length) h += `<h3 class="warn">${t("unreadable", DATA.errors.length)}</h3><div class="list">${DATA.errors.map((e) => `<div class="path">${esc(e.path)} — ${esc(e.kind)}</div>`).join("")}</div>`;
   h += `<h3>${t("startHere")}</h3><div class="muted">${t("startText")}</div>`;
   return h;
@@ -1260,6 +1299,7 @@ $("projReveal").onclick = () => revealInFiles({ path: "" });
 $("disconnectBtn").onclick = () => connect("disconnect");
 document.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => b.closest(".modal").style.display = "none");
 window.addEventListener("resize", () => { requestAnimationFrame(drawWires); if (TOUR) requestAnimationFrame(placeTour); });
+window.addEventListener("hashchange", () => { if (DATA) applyLocation(); });
 applyLang();
 boot();
 </script>

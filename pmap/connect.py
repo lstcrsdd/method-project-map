@@ -61,8 +61,16 @@ def launcher_path(root: Optional[Path] = None) -> Path:
     return root / "bin" / ("pmap.cmd" if os.name == "nt" else "pmap")
 
 
+def venv_python(root: Optional[Path] = None) -> Path:
+    """The Python of ~/.pmap/venv, where `pmap langs install` puts the tree-sitter grammars."""
+    venv = (root or pmap_home()) / "venv"
+    return venv / "Scripts" / "python.exe" if os.name == "nt" else venv / "bin" / "python"
+
+
 def install_runtime(root: Optional[Path] = None) -> Path:
-    """Copy this pmap package to ~/.pmap/lib and write launchers to ~/.pmap/bin; returns the launcher."""
+    """Copy this pmap package to ~/.pmap/lib and write launchers to ~/.pmap/bin; returns the launcher.
+
+    The launchers use ~/.pmap/venv when it exists (it carries the grammars for languages besides Python)."""
     root = root or pmap_home()
     lib, target = root / "lib", root / "lib" / "pmap"
     source = _package_dir()
@@ -72,7 +80,7 @@ def install_runtime(root: Optional[Path] = None) -> Path:
         shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "._*", "*.pyc"))
     bin_dir = root / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
-    python = sys.executable
+    python = venv_python(root) if venv_python(root).exists() else Path(sys.executable)
     sh = bin_dir / "pmap"
     sh.write_text(
         "#!/bin/sh\n# Method Project Map launcher (installed by `pmap connect`)\n"
@@ -80,11 +88,34 @@ def install_runtime(root: Optional[Path] = None) -> Path:
         encoding="utf-8",
     )
     sh.chmod(0o755)
-    (bin_dir / "pmap.cmd").write_text(
-        f'@echo off\r\nrem Method Project Map launcher (installed by `pmap connect`)\r\n"{python}" -I -c "{BOOTSTRAP}" "{lib}" %*\r\n',
-        encoding="utf-8",
-    )
+    (bin_dir / "pmap.cmd").write_bytes(  # bytes: write_text would turn \r\n into \r\r\n on Windows
+        f'@echo off\r\nrem Method Project Map launcher (installed by `pmap connect`)\r\n"{python}" -I -c "{BOOTSTRAP}" "{lib}" %*\r\n'
+        .encode("utf-8"))
     return launcher_path(root)
+
+
+def install_languages(root: Optional[Path] = None, log=print) -> List[str]:
+    """Create ~/.pmap/venv with tree-sitter and the grammars, then point the launchers at it."""
+    from pmap.langs import PIP_PACKAGES
+
+    root = root or pmap_home()
+    python = venv_python(root)
+    report = []
+    if not python.exists():
+        log(f"Creating {root / 'venv'} ...")
+        made = subprocess.run([sys.executable, "-m", "venv", str(root / "venv")], capture_output=True, text=True)
+        if made.returncode != 0:
+            raise RuntimeError("could not create a virtual environment (on Debian/Ubuntu: apt install python3-venv): "
+                               + (made.stderr or made.stdout).strip()[-400:])
+        report.append(f"Environment: {root / 'venv'}")
+    log("Installing tree-sitter grammars (TypeScript/JavaScript, Go, Java, Kotlin, C#) ...")
+    pip = subprocess.run([str(python), "-m", "pip", "install", "--disable-pip-version-check", "--quiet", "--upgrade",
+                          *PIP_PACKAGES], capture_output=True, text=True)
+    if pip.returncode != 0:
+        raise RuntimeError("pip could not install the grammars: " + (pip.stderr or pip.stdout).strip()[-400:])
+    report.append("Grammars: " + ", ".join(PIP_PACKAGES))
+    report.append(f"Runtime: {install_runtime(root)} (now runs on {python})")
+    return report
 
 
 def _quote(path: Path) -> str:
@@ -216,7 +247,7 @@ def _replace_block(text: str, start: str, end: str, block: Optional[str]) -> str
 
 
 def _rule_text(launcher: Path) -> str:
-    return (f"## Method Project Map\nIn Python repositories, orient with Method Project Map before reading files: use the overview "
+    return (f"## Method Project Map\nIn code repositories, orient with Method Project Map before reading files: use the overview "
             f"injected at session start or run `{launcher} context . --max-chars 8000`, then `{launcher} find <name>`, "
             f"`{launcher} show <node-id|path>` and `{launcher} source <node-id>` (or the pmap_* MCP tools) to locate and "
             "read only the code you need. Trust `resolved` links, verify `inferred` ones; details in the project-map skill.")
@@ -279,7 +310,7 @@ def connect(claude: bool = True, codex: bool = False) -> List[str]:
     if codex:
         report += connect_codex(launcher)
     if claude:
-        report.append("New Claude Code sessions in Python projects now start with a project map overview.")
+        report.append("New Claude Code sessions in code projects now start with a project map overview.")
     return report
 
 

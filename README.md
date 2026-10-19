@@ -1,11 +1,12 @@
 <h1 align="center">Method Project Map</h1>
 
 <p align="center">
-  <b>See how a Python project is built — and let your AI agent see it too.</b>
+  <b>See how a codebase is built — and let your AI agent see it too.</b>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="Python | TypeScript | JavaScript | Go | Java | Kotlin | C#" src="https://img.shields.io/badge/languages-Python%20%7C%20TS%2FJS%20%7C%20Go%20%7C%20Java%20%7C%20Kotlin%20%7C%20C%23-8A2BE2.svg">
   <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-3776AB.svg">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-brightgreen.svg">
   <img alt="macOS | Linux | Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg">
@@ -21,7 +22,7 @@
 
 ![Method Project Map: packages stacked in layers, the links of the selected package](docs/images/overview-en.png)
 
-**Method Project Map** reads a Python codebase statically and draws its structure: packages, files, classes, functions, and who imports, calls and inherits whom. No AI and no network are involved: the map is computed, so it is the same every time and refreshes itself when the code changes.
+**Method Project Map** reads a codebase statically (Python, TypeScript / JavaScript, Go, Java, Kotlin, C#) and draws its structure: packages, files, classes, functions, and who imports, calls and inherits whom. No AI and no network are involved: the map is computed, so it is the same every time and refreshes itself when the code changes.
 
 One map serves three jobs:
 
@@ -33,7 +34,7 @@ Every link carries a confidence level: **confirmed**, **possible** or **unresolv
 
 ## Quick start
 
-You need Python 3.9 or newer, and nothing else.
+You need Python 3.9 or newer to run the tool, whatever language your project is in. The installer also fetches the tree-sitter grammars for TypeScript / JavaScript, Go, Java, Kotlin and C# (about 10 MB from PyPI, into `~/.pmap/venv`); add `--python-only` to skip them.
 
 ```bash
 git clone https://github.com/lstcrsdd/method-project-map.git
@@ -51,6 +52,7 @@ Then open **Method Project Map** from Applications (macOS), the Start menu (Wind
 | Install and connect Claude Code (default) | `./install.sh` | `install.bat` |
 | …connect Codex / both agents | `./install.sh --codex` / `--all` | `install.bat --codex` / `--all` |
 | Install without connecting any agent | `./install.sh --none` | `install.bat --none` |
+| Skip the grammars for other languages | `./install.sh --python-only` | `install.bat --python-only` |
 | Run from the downloaded folder | `./pmap-ui.sh`, or double-click `Method Project Map.command` on macOS | double-click `pmap-ui.bat` |
 
 Everything goes to `~/.pmap`, plus the app shortcut. To undo: `pmap disconnect --all`, `pmap shortcut --remove`, then delete `~/.pmap`.
@@ -72,6 +74,18 @@ More:
 - export diagrams to Mermaid;
 - save the whole map as one self-contained HTML page for a website or wiki;
 - use the interface in **English and Russian**, with a built-in reference and a guided tour.
+
+## Languages
+
+| Language | What the map understands |
+|---|---|
+| **Python** | imports (relative, `src/` layouts, re-exports), calls through scopes and type annotations, inheritance — built in, no dependencies |
+| **TypeScript / JavaScript** | ES modules and CommonJS, `tsconfig` path aliases, barrel re-exports, monorepo packages, JSX components, typed parameters and fields |
+| **Go** | `go.mod` modules, packages spread over files, methods on receivers, embedding, interfaces |
+| **Java / Kotlin** | packages, single, wildcard and static imports, same-package classes, Kotlin top-level functions, Java and Kotlin mixed in one project |
+| **C#** | block and file-scoped namespaces, `using`, `using static`, `global using`, aliases, records, top-level statements |
+
+One project may mix languages. Variables typed by a declaration, a constructor or the declared result of a project function are followed; calls on anything else are reported as unresolved instead of guessed. On Go's own `net/http` (157 files, mapped in 0.6 s) 70% of calls are proven, 4% possible and 27% honestly unresolved. `pmap langs` shows which grammars are installed; `pmap langs install` adds them.
 
 ## For AI agents
 
@@ -111,7 +125,7 @@ Agents that were only *told* about the map almost never used it, so the overview
 
 ## How it works
 
-1. **Scan.** Python's own `ast` parser reads every file. Imports, calls and base classes are resolved through scopes, import roots (`src/` layouts are detected) and type annotations. A link that cannot be proven is marked `inferred`, with its candidates, or `unresolved`. It is never silently promoted.
+1. **Scan.** Python's own `ast` parser reads Python files, tree-sitter the other languages. Imports, calls and base classes are resolved through scopes, import roots (`src/` layouts are detected) and type annotations. A link that cannot be proven is marked `inferred`, with its candidates, or `unresolved`. It is never silently promoted.
 2. **Map.** The result is an *actual map* in the PMF format (`.pmap/actual.json`), with file hashes so that a stale map is never served.
 3. **Compare.** An optional *design map* (`design.yaml`) is compared with the actual map using the Reflexion model (Murphy & Notkin, 1995). The result is convergences, divergences and absences.
 4. **Deliver.** The same map is served to people (web UI), agents (overview, CLI, MCP) and CI (`pmap check`).
@@ -119,18 +133,19 @@ Agents that were only *told* about the map almost never used it, so the overview
 ## Repository layout
 
 ```text
-pmap/            the tool: scanner, parser, queries, Reflexion, web UI, MCP server, agent connection
+pmap/            the tool: scanner, parsers (pmap/langs for languages besides Python), queries, Reflexion, web UI, MCP server
 spec/            PMF 0.2 format specification and JSON Schema
 docs/            user guides (EN/RU), agent protocol, screenshots
 plugins/         generated plugin for Claude Code and Codex (scripts/build_plugin.py)
 examples/        a small project with design.yaml and one deliberate architecture violation
 bench/           agent benchmark: tasks, synthetic projects, hidden tests, reports
-tests/           unit tests (python3 -m unittest discover -s tests)
+tests/           unit tests and one small project per language (python3 -m unittest discover -s tests)
 ```
 
 ## Limitations
 
-- Python only, for now.
+- No type checker: calls on values whose type the map cannot see (untyped variables, library return values) stay unresolved.
+- Generated or vendored code clutters the map; leave it out with `.pmapignore`.
 - Static, closed-world analysis: no calls from code outside the repository, no monkey-patching, no `getattr` by name.
 - The Windows installer, the Windows and Linux shortcuts and folder dialogs, and the Codex plugin install have not been tried on real machines yet. Reports are welcome.
 

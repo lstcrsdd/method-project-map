@@ -104,6 +104,26 @@
         "$ref": "#/$defs/ScanError"
       },
       "description": "Files the scanner could not analyse; they are absent from nodes and edges."
+    },
+    "languages": {
+      "type": "object",
+      "description": "Source files per language and whether they are on the map (other languages need the optional tree-sitter grammars).",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mapped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "files",
+          "mapped"
+        ]
+      }
     }
   },
   "allOf": [
@@ -422,7 +442,8 @@
           "enum": [
             "syntax_error",
             "decode_error",
-            "duplicate_module"
+            "duplicate_module",
+            "partial_parse"
           ]
         },
         "message": {

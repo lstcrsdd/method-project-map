@@ -17,7 +17,7 @@ This guide covers installing Method Project Map, reading the map, checking archi
 
 ## 1. Install
 
-You need **Python 3.9 or newer**. Nothing else: the tool uses only the standard library and works offline.
+You need **Python 3.9 or newer** to run the tool, whatever language your project is in. Python projects need nothing else. For TypeScript / JavaScript, Go, Java, Kotlin and C# the installer downloads the tree-sitter grammars (about 10 MB from PyPI) into its own environment, `~/.pmap/venv`; `--python-only` skips that, and `pmap langs install` adds it later.
 
 ```bash
 git clone https://github.com/lstcrsdd/method-project-map.git
@@ -30,6 +30,7 @@ cd method-project-map
 | Install and connect Codex | `./install.sh --codex` | `install.bat --codex` |
 | Install and connect both agents | `./install.sh --all` | `install.bat --all` |
 | Install without connecting any agent | `./install.sh --none` | `install.bat --none` |
+| Skip the grammars for other languages | add `--python-only` | add `--python-only` |
 
 The installer:
 
@@ -144,7 +145,18 @@ Click the **project name** at the top left to:
 - reopen one of the recent projects;
 - show the current project folder in Finder / Explorer.
 
-Any folder with Python files works. A home folder or a whole disk is refused: choose one project.
+Any folder with source code works. A home folder or a whole disk is refused: choose one project.
+
+**Languages.** Python is built in. TypeScript / JavaScript, Go, Java, Kotlin and C# need the grammars (`pmap langs` shows what is installed, `pmap langs install` adds the rest). Languages can be mixed in one project; the project panel lists them and flags any that are not on the map. What the map follows:
+
+| Language | Imports and names | Calls |
+|---|---|---|
+| TypeScript / JavaScript | relative paths, `tsconfig` / `jsconfig` `baseUrl` and `paths`, `index` files, re-exports (`export * from`), monorepo packages by name, `require()` | functions and classes, `new X()`, JSX `<Component />`, methods through typed parameters, fields and `new` |
+| Go | `go.mod` module paths, aliases, all files of a package | package functions, struct literals, methods (exact for concrete types, possible through interfaces), embedding |
+| Java / Kotlin | package declarations, single, wildcard and static imports, same-package classes, Kotlin aliases and top-level functions | static and instance methods, constructors, implicit `this`, typed fields and locals |
+| C# | namespaces (block and file-scoped) and their parents, `using`, `using static`, `global using`, aliases | static and instance methods, constructors, implicit `this`, typed fields, properties and locals |
+
+Ids of non-Python code use the file path: `sym:src/billing/invoice.ts:InvoiceService.issue`.
 
 **Import roots.** Projects with a `src/` layout are detected automatically. For other layouts run `pmap scan . --root DIR` once (repeat `--root` for several roots): the saved map remembers them.
 
@@ -239,7 +251,7 @@ Agents waste much of their context reading files just to find their way. Method 
 
 Every change is a marked block; each config file is backed up as `<name>.bak-pmap` before the first change. **Disconnect** (or `pmap disconnect --all`) removes exactly these additions.
 
-The hook works only in Python projects (it looks for `.git`, `pyproject.toml`, `setup.py`, `requirements.txt` and similar, or for a folder with Python packages). It stays silent elsewhere, in the home folder and on any error.
+The hook works only in code projects (it looks for `.git`, `pyproject.toml`, `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `*.csproj` and similar, or for a folder with Python packages). It stays silent elsewhere, in the home folder and on any error.
 
 ### As a plugin
 
@@ -319,6 +331,7 @@ All commands: `pmap <command> --help`.
 | `pmap connect` / `disconnect` | AI agents | `--claude`, `--codex`, `--all` |
 | `pmap connection` | which agents are connected | |
 | `pmap shortcut` | create the app shortcut | `--remove` |
+| `pmap langs` | which language grammars are installed | `install` |
 | `pmap hook session-start` | used by the Claude Code hook | |
 
 ## 9. Troubleshooting
@@ -326,13 +339,14 @@ All commands: `pmap <command> --help`.
 | What you see | Why and what to do |
 |---|---|
 | *stopped — open Method Project Map again* | the map stopped after its tab was closed or idle; start it again |
-| *No Python files in …* | choose the project folder itself, not the folder above or next to it |
-| *That is too wide …* | a home folder, a disk or a folder with more than 20,000 Python files; choose one project |
+| *No source files in …* | choose the project folder itself, not the folder above or next to it |
+| A language is marked *not on the map* | its grammar is missing: run `pmap langs install`, then reopen the map |
+| *That is too wide …* | a home folder, a disk or a folder with more than 20,000 source files; choose one project |
 | macOS asks for access to files | allow it once; the shortcut must read the project folder |
 | A file is missing from the map | see *Files the map could not read* in the project panel (syntax error), or check `.pmapignore` |
 | An expected link is missing | turn on **Possible links**; calls through variables, `getattr` or code outside the repository cannot be proven |
 | Another program uses port 8765 | nothing to do: the map takes the next free port |
-| The agent does not get an overview | `pmap connection` shows what is connected; the hook acts only in Python projects |
+| The agent does not get an overview | `pmap connection` shows what is connected; the hook acts only in code projects |
 
 ## 10. Uninstall
 

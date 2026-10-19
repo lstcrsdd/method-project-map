@@ -140,7 +140,7 @@ class ActualEdge:
 class ScanError:
     """A file the scanner could not analyse (it is absent from the map's nodes)."""
     path: str
-    kind: str  # "syntax_error" | "decode_error" | "duplicate_module"
+    kind: str  # "syntax_error" | "decode_error" | "duplicate_module" | "partial_parse" (mapped, but with gaps)
     message: str
     line: int | None = None
     file_hash: str | None = None
@@ -177,6 +177,7 @@ class ActualMap:
     edges: list[ActualEdge] = field(default_factory=list)
     import_roots: list[str] = field(default_factory=lambda: ["."])
     errors: list[ScanError] = field(default_factory=list)
+    languages: dict[str, dict[str, Any]] = field(default_factory=dict)  # language -> {"files": n, "mapped": bool}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -189,6 +190,7 @@ class ActualMap:
                 "version": self.scanner_version,
             },
             "import_roots": list(self.import_roots),
+            "languages": {k: dict(v) for k, v in self.languages.items()},
             "errors": [e.to_dict() for e in self.errors],
             "nodes": [n.to_dict() for n in self.nodes],
             "edges": [e.to_dict() for e in self.edges],
@@ -207,6 +209,7 @@ class ActualMap:
             edges=[ActualEdge.from_dict(e) for e in data.get("edges", [])],
             import_roots=list(data.get("import_roots", ["."])),
             errors=[ScanError.from_dict(e) for e in data.get("errors", [])],
+            languages={k: dict(v) for k, v in (data.get("languages") or {}).items()},
         )
 
 

@@ -195,9 +195,18 @@ def format_agent_context(
         f"# Method Project Map: {proj_title} (PMF v{actual.pmf_version})",
         "Edges listed are statically proven (resolved); inferred/unresolved ones are omitted.",
     ]
-    if actual.errors:
+    names = {"python": "Python", "typescript": "TypeScript", "javascript": "JavaScript", "go": "Go", "java": "Java",
+             "kotlin": "Kotlin", "csharp": "C#"}
+    if actual.languages and (len(actual.languages) > 1 or "python" not in actual.languages):
+        parts = [f"{names.get(k, k)} {v.get('files', 0)} files" + ("" if v.get("mapped") else " (NOT MAPPED)")
+                 for k, v in sorted(actual.languages.items(), key=lambda kv: -kv[1].get("files", 0))]
+        header_lines.append("Languages: " + ", ".join(parts))
+        if any(not v.get("mapped") for v in actual.languages.values()):
+            header_lines.append("[NOT MAPPED] languages need their grammars: run `pmap langs install`.")
+    unreadable = [e for e in actual.errors if e.kind != "partial_parse"]
+    if unreadable:
         header_lines.append(
-            f"[NOT MAPPED] {len(actual.errors)} unparsable file(s): " + ", ".join(e.path for e in actual.errors[:5])
+            f"[NOT MAPPED] {len(unreadable)} unparsable file(s): " + ", ".join(e.path for e in unreadable[:5])
         )
     if report is not None:
         header_lines.append(
