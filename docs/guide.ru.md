@@ -1,6 +1,6 @@
 # Method Project Map — руководство пользователя
 
-[English version](guide.en.md) · [К README](../README.ru.md)
+[English version](guide.en.md) · [К README](../README.ru.md) · [Method Network](https://method-network.com/)
 
 Здесь описано, как установить Method Project Map, читать карту, проверять архитектуру, подключать ИИ-агентов, и перечислены все команды. В самой карте то же самое есть во встроенном виде: кнопка **?** открывает справочник и минутное обучение.
 

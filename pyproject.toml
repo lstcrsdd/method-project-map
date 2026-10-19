@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lstcrsdd/method-project-map"
+Homepage = "https://method-network.com/"
 Repository = "https://github.com/lstcrsdd/method-project-map"
 Issues = "https://github.com/lstcrsdd/method-project-map/issues"
 

@@ -15,6 +15,10 @@
   <a href="README.md">English</a> · <b>Русский</b>
 </p>
 
+<p align="center">
+  Проект <a href="https://method-network.com/"><b>Method Network</b></a>
+</p>
+
 ![Method Project Map: пакеты по слоям и связи выбранного пакета](docs/images/overview-ru.png)
 
 **Method Project Map** читает Python-проект статически и рисует его устройство: пакеты, файлы, классы, функции и кто кого импортирует, вызывает и от кого наследуется. ИИ и интернет здесь не участвуют: карта вычисляется, поэтому она всегда одинакова и сама обновляется, когда меняется код.
@@ -136,4 +140,4 @@ tests/           тесты (python3 -m unittest discover -s tests)
 
 ## Лицензия
 
-[MIT](LICENSE) © lstcrsdd
+[MIT](LICENSE) © lstcrsdd · [Method Network](https://method-network.com/)

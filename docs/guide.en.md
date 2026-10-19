@@ -1,6 +1,6 @@
 # Method Project Map — user guide
 
-[Русская версия](guide.ru.md) · [Back to README](../README.md)
+[Русская версия](guide.ru.md) · [Back to README](../README.md) · [Method Network](https://method-network.com/)
 
 This guide covers installing Method Project Map, reading the map, checking architecture, connecting AI agents and every command. The map itself has the same material built in: press **?** for the reference or take the one-minute tour.
 

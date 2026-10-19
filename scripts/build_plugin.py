@@ -65,7 +65,7 @@ exec "$PY" -I -c "{BOOTSTRAP}" "$DIR/lib" "$@"
         "version": __version__,
         "description": DESCRIPTION,
         "author": {"name": "lstcrsdd", "url": "https://github.com/lstcrsdd"},
-        "homepage": "https://github.com/lstcrsdd/method-project-map",
+        "homepage": "https://method-network.com/",
         "repository": "https://github.com/lstcrsdd/method-project-map",
         "license": "MIT",
         "keywords": ["code map", "architecture", "navigation", "python", "mcp"],

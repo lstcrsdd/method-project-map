@@ -15,6 +15,10 @@
   <b>English</b> · <a href="README.ru.md">Русский</a>
 </p>
 
+<p align="center">
+  A project by <a href="https://method-network.com/"><b>Method Network</b></a>
+</p>
+
 ![Method Project Map: packages stacked in layers, the links of the selected package](docs/images/overview-en.png)
 
 **Method Project Map** reads a Python codebase statically and draws its structure: packages, files, classes, functions, and who imports, calls and inherits whom. No AI and no network are involved: the map is computed, so it is the same every time and refreshes itself when the code changes.
@@ -136,4 +140,4 @@ Issues and pull requests are welcome. Before sending a change, run `python3 -m u
 
 ## License
 
-[MIT](LICENSE) © lstcrsdd
+[MIT](LICENSE) © lstcrsdd · [Method Network](https://method-network.com/)
