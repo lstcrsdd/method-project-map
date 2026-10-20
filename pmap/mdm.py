@@ -5,6 +5,7 @@ functions with the objects they take (`из:`) and give (`в:`). A coding agent 
 or object is implemented with a `код:` line. That is enough to check the code against the scheme:
 
 - a function or object with `код:` is a subsystem (`f-2-1`, `o-zayavka`), its paths are the `код:` globs;
+  objects with the same `код:` («Заявка», «Проверенная заявка») are one data type and share a subsystem;
 - a function may depend on the objects it takes or gives (required: an unused one is an absence);
 - functions wired by an object (one gives what the other takes), a function and its subfunctions, and
   two objects handled by one function may depend on each other in either direction (optional);
@@ -217,11 +218,20 @@ def design_from_mdm(text: str, repo_root: Optional[Path] = None, source: str = "
         for t in fn.inputs + fn.outputs:
             titles.setdefault(_key(t), t)
     used_ids: set[str] = set()
+    # Objects with the same `код:` are one data type in the code: a scheme turns «Заявка» into «Проверенная
+    # заявка», the code keeps one class. They share a subsystem, so a function may use it if it takes or gives
+    # any of them.
+    by_paths: dict[frozenset[str], SubsystemSpec] = {}
     for obj in scheme.objects:
         paths, bad = code_paths(obj.code, repo_root)
         if bad:
             notes.append(f"{source}: object «{obj.title}»: `код:` items that are not repository paths: {', '.join(bad)}")
         if not paths or _key(obj.title) in obj_sub:
+            continue
+        same = by_paths.get(frozenset(paths))
+        if same is not None:
+            obj_sub[_key(obj.title)] = same.id
+            same.name = f"{same.name}, {obj.title}"
             continue
         base = "o-" + (slug(obj.title) or str(len(obj_sub) + 1))
         sid, n = base, 2
@@ -229,7 +239,9 @@ def design_from_mdm(text: str, repo_root: Optional[Path] = None, source: str = "
             sid, n = f"{base}-{n}", n + 1
         used_ids.add(sid)
         obj_sub[_key(obj.title)] = sid
-        subsystems.append(SubsystemSpec(id=sid, name=obj.title, paths=paths, description="mDm object"))
+        sub = SubsystemSpec(id=sid, name=obj.title, paths=paths, description="mDm object")
+        by_paths[frozenset(paths)] = sub
+        subsystems.append(sub)
 
     deps: dict[tuple[str, str], AllowedDependencySpec] = {}
 

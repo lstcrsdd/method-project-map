@@ -6,6 +6,7 @@
 
 - functions and objects with a `код:` line become subsystems (`f-2-1`, `o-zayavka`); folders, `file:Name` and node ids in `код:` resolve to files;
 - the scheme's wiring is what the code may use: a function → its objects (required), functions joined by an object, a function and its subfunctions, objects handled by one function (permitted either way);
+- objects with the same `код:` are one data type («Заявка» and «Проверенная заявка» share one class) and one subsystem;
 - anything else is a divergence, reported with the function names; functions without `код:` are listed in a warning;
 - the agent overview opens with the functions and their paths; `PROJECT.mdm` marks a code project for the hook.
 

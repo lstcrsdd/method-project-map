@@ -111,6 +111,18 @@ class TestMdmScheme(unittest.TestCase):
         self.assertNotIn("Architecture status", text)
         self.assertIn("[mDm] PROJECT.mdm: no function is linked to code yet", text)
 
+    def test_objects_with_the_same_code_are_one_type(self) -> None:
+        design = design_from_mdm(
+            "## Функции\n1 Принять заявку\n  в: Заявка\n  код: app/intake.py\n"
+            "2 Проверить заявку\n  из: Заявка\n  в: Проверенная заявка\n  код: app/check.py\n"
+            "3 Исполнить\n  из: Проверенная заявка\n  код: app/run.py\n"
+            "## Объекты\nЗаявка · код: app/models.py\nПроверенная заявка · код: app/models.py\n")
+        objects = [s for s in design.subsystems if s.id.startswith("o-")]
+        self.assertEqual([(s.id, s.name) for s in objects], [("o-zayavka", "Заявка, Проверенная заявка")])
+        allowed = {(d.from_subsystem, d.to_subsystem) for d in design.allowed_dependencies}
+        self.assertTrue({("f-1", "o-zayavka"), ("f-2", "o-zayavka"), ("f-3", "o-zayavka")} <= allowed)
+        self.assertNotIn(("o-zayavka", "o-zayavka"), allowed)
+
     def test_design_yaml_wins_over_the_scheme(self) -> None:
         self.assertEqual(find_design(ROOT_DIR / "examples").source, "yaml")  # type: ignore[union-attr]
 
