@@ -11,7 +11,7 @@ from pathlib import Path
 from pmap.loader import find_design
 from pmap.mdm import code_paths, design_from_mdm, parse_mdm, slug
 from pmap.mermaid import format_agent_context
-from pmap.models import DesignMap
+from pmap.models import ActualMap, DesignMap
 from pmap.reflexion import check_reflexion, format_reflexion_text
 from pmap.scanner import ProjectScanner
 from pmap.yaml_loader import validate_pmf_document
@@ -132,6 +132,16 @@ class TestMdmScheme(unittest.TestCase):
         self.assertEqual(proc.returncode, 1, proc.stderr)
         report = json.loads(proc.stdout)
         self.assertEqual(report["summary"]["divergences"], 1)
+
+
+class TestHonestReport(unittest.TestCase):
+    def test_check_names_languages_that_are_not_on_the_map(self) -> None:
+        actual = ActualMap(pmf_version="0.2.0", generated_at="2026-10-20T00:00:00Z", repo_root=".",
+                           languages={"python": {"files": 2, "mapped": True}, "javascript": {"files": 124, "mapped": False}})
+        report = check_reflexion(find_design(BOOKING), actual)  # type: ignore[arg-type]
+        self.assertTrue(report.is_clean)
+        self.assertIn("124 JavaScript file(s) are not on the map and not checked", "\n".join(report.warnings))
+        self.assertNotIn("Python file(s)", "\n".join(report.warnings))
 
 
 class TestRequiredFlag(unittest.TestCase):

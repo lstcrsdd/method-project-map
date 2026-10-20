@@ -9,6 +9,10 @@ from typing import Any
 from pmap.models import ActualEdge, ActualMap, ActualNode, DesignMap
 
 
+LANGUAGE_NAMES = {"python": "Python", "typescript": "TypeScript", "javascript": "JavaScript", "go": "Go", "java": "Java",
+                  "kotlin": "Kotlin", "csharp": "C#", "swift": "Swift", "dart": "Dart", "rust": "Rust", "cpp": "C/C++"}
+
+
 def _glob_to_regex(pattern: str) -> re.Pattern[str]:
     """Convert a POSIX path glob (supporting `*`, `?`, and `**`) to a compiled regex."""
     norm = pattern.strip().strip("/")
@@ -259,6 +263,13 @@ def check_reflexion(design: DesignMap, actual: ActualMap, include_type_only: boo
             )
 
     warnings: list[str] = list(design.notes)
+    # A language without its grammar is absent from the map: "no divergences" would only mean "not looked at".
+    for lang, info in sorted(actual.languages.items()):
+        if not info.get("mapped"):
+            warnings.append(
+                f"{info.get('files', 0)} {LANGUAGE_NAMES.get(lang, lang)} file(s) are not on the map and not checked: "
+                "the grammar is not installed (`pmap langs install`)"
+            )
     if actual.errors:
         warnings.append(
             f"{len(actual.errors)} file(s) could not be analysed and are absent from the check: "

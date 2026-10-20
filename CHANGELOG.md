@@ -10,6 +10,8 @@
 - anything else is a divergence, reported with the function names; functions without `код:` are listed in a warning;
 - the agent overview opens with the functions and their paths; `PROJECT.mdm` marks a code project for the hook.
 
+**Honest check:** `pmap check` names every language whose grammar is missing — those files are not on the map, so "no divergences" does not cover them.
+
 **Format:** an allowed dependency may say `required: false` — it is permitted but its absence is not reported. Optional, so the format version stays 0.2.0.
 
 ## 0.4.0 — 2026-10-19

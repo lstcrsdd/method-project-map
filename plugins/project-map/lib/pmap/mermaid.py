@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from pmap.models import ActualMap, ActualNode, DesignMap
-from pmap.reflexion import ReflexionReport, check_reflexion
+from pmap.reflexion import LANGUAGE_NAMES, ReflexionReport, check_reflexion
 
 
 def _safe_mermaid_id(raw_id: str) -> str:
@@ -195,8 +195,7 @@ def format_agent_context(
         f"# Method Project Map: {proj_title} (PMF v{actual.pmf_version})",
         "Edges listed are statically proven (resolved); inferred/unresolved ones are omitted.",
     ]
-    names = {"python": "Python", "typescript": "TypeScript", "javascript": "JavaScript", "go": "Go", "java": "Java",
-             "kotlin": "Kotlin", "csharp": "C#", "swift": "Swift", "dart": "Dart", "rust": "Rust", "cpp": "C/C++"}
+    names = LANGUAGE_NAMES
     if actual.languages and (len(actual.languages) > 1 or "python" not in actual.languages):
         parts = [f"{names.get(k, k)} {v.get('files', 0)} files" + ("" if v.get("mapped") else " (NOT MAPPED)")
                  for k, v in sorted(actual.languages.items(), key=lambda kv: -kv[1].get("files", 0))]
