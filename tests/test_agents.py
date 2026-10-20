@@ -116,6 +116,13 @@ class TestConnect(SandboxHome):
         settings = json.loads((claude / "settings.json").read_text())
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(len(settings["hooks"]["SessionStart"]), 2)
+        self.assertEqual(len(settings["hooks"]["PostToolUse"]), 1)  # the note after an edit
+        self.assertEqual(settings["hooks"]["PostToolUse"][0]["matcher"], "Edit|Write|MultiEdit|apply_patch")
+        self.assertIn("hook post-edit", settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"])
+        codex_hooks = json.loads((codex / "hooks.json").read_text())  # Codex gets both hooks too
+        self.assertEqual([len(codex_hooks["hooks"][e]) for e in ("SessionStart", "PostToolUse")], [1, 1])
+        self.assertTrue(agents.status()["claude"]["edit_notes"])
+        self.assertTrue(agents.status()["codex"]["edit_notes"])
         self.assertEqual((claude / "CLAUDE.md").read_text().count("pmap:start"), 1)
         self.assertEqual((codex / "config.toml").read_text().count("[mcp_servers.pmap]"), 1)
         self.assertTrue((claude / "skills" / "project-map" / "SKILL.md").exists())
@@ -131,6 +138,7 @@ class TestConnect(SandboxHome):
         self.assertEqual(json.loads((claude / "settings.json").read_text()), original)
         self.assertEqual((claude / "CLAUDE.md").read_text(), "# My rules\n")
         self.assertEqual((codex / "config.toml").read_text(), 'model = "x"\n')
+        self.assertFalse((codex / "hooks.json").exists())
         self.assertFalse(agents.status()["claude"]["connected"])
 
     @unittest.skipIf(os.name == "nt", "POSIX launcher")

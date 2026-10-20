@@ -8,13 +8,13 @@
 :root {
   --bg: #f5f6f8; --panel: #ffffff; --ink: #18202c; --muted: #677285; --line: #e2e6ec; --accent: #2563eb;
   --card: #ffffff; --card-line: #d5dbe4; --band: #eef1f5; --uses: #2563eb; --usedby: #059669; --warn: #dc2626;
-  --maybe: #b7791f; --chip: #edf1f6; --dim: .22; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --maybe: #b7791f; --bridge: #9333ea; --chip: #edf1f6; --dim: .22; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #11141a; --panel: #181c24; --ink: #e7eaf0; --muted: #96a0b2; --line: #2a303b; --accent: #6b9dff;
     --card: #1e232d; --card-line: #353d4b; --band: #161a21; --uses: #6b9dff; --usedby: #34d399; --warn: #f87171;
-    --maybe: #e2b04a; --chip: #252b36; --shadow: none; }
+    --maybe: #e2b04a; --bridge: #c084fc; --chip: #252b36; --shadow: none; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
@@ -53,7 +53,7 @@ aside { background: var(--panel); overflow: auto; min-height: 0; }
 #wires path { fill: none; stroke-width: 2; opacity: .85; }
 #wires .uses { stroke: var(--uses); } #wires .usedby { stroke: var(--usedby); }
 #wires .warn { stroke: var(--warn); stroke-width: 2.6; } #wires .maybe { stroke: var(--maybe); stroke-dasharray: 5 4; }
-#wires .unused { stroke: var(--muted); stroke-dasharray: 2 5; }
+#wires .unused { stroke: var(--muted); stroke-dasharray: 2 5; } #wires .bridge { stroke: var(--bridge); }
 #wires text { font-size: 11px; fill: var(--warn); font-weight: 600; }
 .band { background: var(--band); border-radius: 12px; padding: 10px 12px 12px; margin-bottom: 14px; }
 .band h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
@@ -61,6 +61,7 @@ aside { background: var(--panel); overflow: auto; min-height: 0; }
 .cards { display: flex; flex-wrap: wrap; gap: 10px; }
 .card { width: 230px; background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 9px 11px; cursor: pointer;
   box-shadow: var(--shadow); transition: opacity .12s, border-color .12s; position: relative; }
+.card.br { border-color: var(--bridge); }
 .card:hover { border-color: var(--accent); }
 .card .t { font-weight: 600; word-break: break-word; }
 .card .d { color: var(--muted); font-size: 12.5px; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -88,6 +89,7 @@ aside { background: var(--panel); overflow: auto; min-height: 0; }
 .sym .sel { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--chip); }
 .sym.dim, .card.dim { opacity: var(--dim); }
 .via { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; word-break: break-word; }
+.via.br, .card .tag.br, .pill.br { color: var(--bridge); }
 .more { color: var(--muted); font-size: 12px; padding: 4px 2px; }
 #details { border-left: 1px solid var(--line); padding: 16px 18px; }
 #details h2 { margin: 2px 0 4px; font-size: 17px; word-break: break-word; }
@@ -97,6 +99,8 @@ aside { background: var(--panel); overflow: auto; min-height: 0; }
 .sig { font-family: var(--mono); font-size: 12px; background: var(--chip); padding: 7px 9px; border-radius: 8px; word-break: break-word; }
 .list div { padding: 4px 0; border-bottom: 1px dashed var(--line); word-break: break-word; }
 .list a, a.lnk { color: var(--accent); cursor: pointer; text-decoration: none; }
+.brl { font-family: var(--mono); font-size: 11px; color: var(--bridge); word-break: break-word; }
+.list div.brl { padding: 2px 0 0; border: 0; } .brl a { color: inherit; text-decoration: underline dotted; } .list .blk { display: block; }
 .pill { font-size: 10.5px; padding: 1px 7px; border-radius: 9px; margin-right: 6px; background: var(--chip); color: var(--muted); white-space: nowrap; }
 .pill.ok { color: var(--usedby); } .pill.maybe { color: var(--maybe); } .pill.warn { color: var(--warn); }
 .ln { font-family: var(--mono); font-size: 11px; color: var(--muted); }
@@ -301,6 +305,14 @@ const L = {
     fileKind: "file", noMatch: "no match", noData: "No map data.",
     languagesH: "Languages", notMapped: "not on the map",
     notMappedHint: "These languages need the optional grammars: run <code>pmap langs install</code>, then reopen the map.",
+    vias: { channel: "channel", "event-channel": "event channel", "message-channel": "message channel", pigeon: "Pigeon", ffi: "C ABI (FFI)", jni: "JNI", frb: "flutter_rust_bridge",
+      uniffi: "UniFFI", tauri: "Tauri command", "network-extension": "NetworkExtension (system)", "android-intent": "Android intent (system)" },
+    brVia: (v, name, m) => `via ${L.en.vias[v] || v}${name ? " " + name : ""}${m ? ` "${m}"` : ""}`, nameNotFound: "(name not found)",
+    brConfirmedTitle: "The names on both sides match exactly (resolved)", brPossibleTitle: "The system picks the target, or several targets match (inferred)",
+    bridgeLegend: "between languages", bridgeTagTitle: (langs) => `Linked with code in ${langs}; no compiler checks these calls`,
+    bridgesH: "Links between languages", bridgesHint: "Calls no compiler checks: change both sides together.",
+    gapLine: (name, m, from, at, missing, to) => `<b>Gap:</b> channel ${name}, "${m}" is called from ${from}${at ? ` (${at})` : ""} but ${missing} does not handle it${to ? ` (${to})` : ""}`,
+    gapHere: (name, m, missing, to) => `<b>Gap:</b> ${missing} does not handle "${m}" of channel ${name}${to ? ` (its handler: ${to})` : ""}; the call fails there at run time.`,
   },
   ru: {
     search: "Найти класс, функцию или файл  ( / )", viewTitle: "Что показывает обзор", viewPkg: "Пакеты", viewDesign: "Архитектура",
@@ -367,6 +379,14 @@ const L = {
     fileKind: "файл", noMatch: "ничего не найдено", noData: "Нет данных карты.",
     languagesH: "Языки", notMapped: "не на карте",
     notMappedHint: "Для этих языков нужны дополнительные грамматики: выполните <code>pmap langs install</code> и откройте карту заново.",
+    vias: { channel: "канал", "event-channel": "канал событий", "message-channel": "канал сообщений", pigeon: "Pigeon", ffi: "C ABI (FFI)", jni: "JNI", frb: "flutter_rust_bridge",
+      uniffi: "UniFFI", tauri: "команда Tauri", "network-extension": "NetworkExtension (система)", "android-intent": "Android intent (система)" },
+    brVia: (v, name, m) => `через ${v === "tauri" ? "команду Tauri" : L.ru.vias[v] || v}${name ? " " + name : ""}${m ? ` «${m}»` : ""}`, nameNotFound: "(имя не найдено)",
+    brConfirmedTitle: "Имена на обеих сторонах совпадают точно (resolved)", brPossibleTitle: "Цель выбирает система, или подходят несколько целей (inferred)",
+    bridgeLegend: "между языками", bridgeTagTitle: (langs) => `Связан с кодом на ${langs}; эти вызовы не проверяет ни один компилятор`,
+    bridgesH: "Мосты между языками", bridgesHint: "Эти вызовы не проверяет ни один компилятор: меняйте обе стороны вместе.",
+    gapLine: (name, m, from, at, missing, to) => `<b>Пропуск:</b> канал ${name}, метод «${m}» вызывается из ${from}${at ? ` (${at})` : ""}, но ${missing} его не обрабатывает${to ? ` (${to})` : ""}`,
+    gapHere: (name, m, missing, to) => `<b>Пропуск:</b> ${missing} не обрабатывает метод «${m}» канала ${name}${to ? ` (его обработчик: ${to})` : ""}; там вызов упадёт во время работы.`,
   },
 };
 Object.assign(L.en, {
@@ -383,6 +403,7 @@ Object.assign(L.en, {
     crumbs: { t: "Where you are", b: "The way back up: overview › package › file. Esc does the same." },
     search: { t: "Search", b: "Type the name of a class, function or file. Press / anywhere to jump here." },
     maybe: { t: "Possible links", b: "By default the map shows only links proven from the code. Turn this on to also see likely ones (dashed) and check those in the code." },
+    bridges: { t: "Links between languages", b: "This project calls from one language into another: platform channels, FFI, system hand-offs. No compiler checks these calls, so the map lists them here, gaps first, and draws them in violet." },
     design: { t: "Architecture", b: "This project has a design.yaml: switch to Architecture to see which dependencies the design allows and where the code breaks the rules." },
     connect: { t: "Connect your AI", b: "Gives Claude Code / Codex a map of every code project they open, so they read less code to find their way. One click to connect, one to disconnect." },
     lang: { t: "Language", b: "Switch between English and Russian." },
@@ -393,15 +414,16 @@ Object.assign(L.en, {
     { id: "langs", t: "Languages", h: "<p><b>Python</b> works out of the box. <b>TypeScript / JavaScript</b> (ES modules, CommonJS, JSX), <b>Go</b>, <b>Java</b>, <b>Kotlin</b>, <b>C#</b>, <b>Swift</b>, <b>Dart / Flutter</b>, <b>Rust</b> and <b>C / C++</b> (Win32, C++/WinRT) use tree-sitter grammars: run <code>pmap langs install</code> once (the installer does it for you). One project may mix languages; the project panel lists them and says which are not on the map yet.</p><p>The same confidence rules apply everywhere. In typed languages the compiler checks declared types, so a call through a variable or field of a project class is <i>confirmed</i> when no subclass overrides the method; through an interface, protocol or trait, or when a subclass overrides it, it is <i>possible</i>. Calls into libraries get no edge: the import already records that dependency.</p>" },
     { id: "levels", t: "Three levels", h: "<p><b>Overview</b> — every card is a package (a folder of code). <b>Package</b> — every card is a file of that package. <b>File</b> — three columns: who uses the file, what is inside it, what it uses.</p><ul><li><b>Click</b> a card to select it and see its links.</li><li><b>Double-click</b> it or press <b>Open</b> to go inside.</li><li>The path at the top, <code>Esc</code> or <code>Backspace</code> take you one level up.</li><li>The <b>Files</b> tree on the left jumps straight to any package, file, class or function.</li></ul>" },
     { id: "layers", t: "Layers", h: "<p>Cards are stacked by dependency. The <b>top layer</b> uses the layers below and nothing uses it: entry points, command line, tests. The <b>foundation</b> at the bottom depends on nothing in view: models, utilities, the core everything is built on. Layers in between build on the ones under them.</p><p>If code at the bottom suddenly uses code at the top, the design is usually worth a closer look.</p>" },
-    { id: "colors", t: "Arrows and colours", h: "<ul><li><span style='color:var(--uses)'>Blue</span> — what the selected item uses.</li><li><span style='color:var(--usedby)'>Green</span> — what uses the selected item.</li><li>A card with a <span style='color:var(--warn)'>red</span> frame both uses the selection and is used by it (a cycle).</li><li>Dashed amber — a possible link (see below).</li><li>In the Architecture view: green — allowed and used, red — not allowed, dotted — allowed but unused.</li></ul><p>Arrows are drawn only for the selected card, so the picture stays readable. Click an empty spot to clear the selection.</p>" },
+    { id: "colors", t: "Arrows and colours", h: "<ul><li><span style='color:var(--uses)'>Blue</span> — what the selected item uses.</li><li><span style='color:var(--usedby)'>Green</span> — what uses the selected item.</li><li>A card with a <span style='color:var(--warn)'>red</span> frame both uses the selection and is used by it (a cycle).</li><li>Dashed amber — a possible link (see below).</li><li><span style='color:var(--bridge)'>Violet</span> — a link between languages: a platform channel, FFI, a system hand-off (see below).</li><li>In the Architecture view: green — allowed and used, red — not allowed, dotted — allowed but unused.</li></ul><p>Arrows are drawn only for the selected card, so the picture stays readable. Click an empty spot to clear the selection.</p>" },
     { id: "trust", t: "Confirmed and possible links", h: "<ul><li><span class='pill ok'>confirmed</span> — proven from the code, for example a direct import or a call of an imported function. You can rely on it.</li><li><span class='pill maybe'>possible</span> — likely but not proven: a call through a typed parameter, a method a subclass may override, a variable assigned in several places. Hidden by default; turn on <b>Possible links</b> to see them.</li><li><b>Calls the map could not resolve</b> are listed in the side panel. The map says nothing about them: read the code.</li></ul><p>The map cannot see calls made from code outside the repository, functions replaced at run time (monkey-patching) or lookups by name with <code>getattr</code>.</p>" },
+    { id: "bridges", t: "Links between languages", h: "<p>Some calls cross from one language into another, and no compiler checks them: Flutter platform channels (<code>invokeMethod('connect')</code> in Dart lands in the Swift, Kotlin or C++ handler of that channel), C functions called through FFI or JNI (Rust, C), Pigeon (to the app's implementation of the generated API), flutter_rust_bridge, UniFFI and Tauri commands, and hand-offs through the system such as Apple NetworkExtension (<code>startVPNTunnel</code> → <code>PacketTunnelProvider.startTunnel</code>) and Android intents that start a service. The map joins both sides and draws these links in <span style='color:var(--bridge)'>violet</span>; the project panel lists them all. <span class='pill ok'>confirmed</span> means the names on both sides match exactly; <span class='pill maybe'>possible</span> means the system picks the target or several targets match. A <b class='warn'>gap</b> is a channel method called from one side that some platform does not handle: the app breaks there only at run time. <code>pmap check .</code> lists the gaps, and connected AI agents get a short note after each edit that names the other side of these links.</p>" },
     { id: "panel", t: "Side panel and search", h: "<p>The right panel describes the selection: what it is (from its docstring), its signature, what it contains, what it uses and who uses it, with line numbers. Buttons: <b>Open</b>, <b>Show source</b> (just that function or class, not the whole file) and <b>Show in Finder / Explorer</b>.</p><p><b>Search</b> (<code>/</code>) finds classes, functions, methods and files by name; <code>↑ ↓</code> choose a result, <code>Enter</code> opens it.</p>" },
     { id: "projects", t: "Projects", h: "<p>Click the project name at the top left: choose a folder in Finder / Explorer, paste a full path, or pick a recent project. Any folder with source code works; a home folder or a whole disk is refused.</p><p>To leave generated or third-party (vendored) code out of the map, put a <code>.pmapignore</code> file in the project root: one pattern per line, <code>folder/</code> skips a whole folder, <code>#</code> starts a comment.</p>" },
     { id: "design", t: "Architecture (design.yaml)", h: "<p>Describe the intended architecture in <code>design.yaml</code> in the project root: the subsystems (which folders belong to each) and which subsystem may use which. The <b>Architecture</b> view then checks the real code against it and shows every forbidden dependency with the file and line it comes from.</p><pre class='src'>subsystems:\n  - id: ui\n    name: User interface\n    paths: ['app/ui/**']\n  - id: services\n    name: Business logic\n    paths: ['app/services/**']\n  - id: db\n    name: Database\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Here a call from <code>ui</code> straight into <code>db</code> shows up in red. In a terminal: <code>pmap check .</code>; add <code>--strict</code> to fail a CI job on violations.</p>" },
     { id: "ai", t: "Connecting AI agents", h: "<p><b>Connect to AI</b> gives Claude Code and/or Codex access to project maps: a skill, a rule, the MCP tools and, for Claude Code, a hook that hands the agent a short overview of the project at the start of every session. In our tests the agent read half as much code with the same quality of fixes.</p><p>Only files in your home folder are changed, each with a backup; <b>Disconnect</b> removes everything again. In a terminal: <code>pmap connect --claude</code>, <code>--codex</code> or <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
     { id: "launch", t: "Starting and stopping", h: "<ul><li>The <b>Method Project Map</b> shortcut (Applications on macOS, the Start menu on Windows, the app menu on Linux) or <code>pmap ui</code> opens the last project; the very first time it asks for a folder.</li><li>Starting it again opens the map that is already running.</li><li>The map stops by itself about 15 minutes after its tab is closed. If the page says “stopped”, start Method Project Map again.</li><li>The status at the top right: <b>live</b> — the map follows file changes; <b>static file</b> — a saved snapshot made by <code>pmap html</code>.</li></ul>" },
     { id: "keys", t: "Keys", h: "<ul><li><code>/</code> — search</li><li><code>Esc</code>, <code>Backspace</code> — one level up, close a window</li><li><code>↑ ↓ Enter</code> — choose and open a search result</li><li>In the tour: <code>→</code> next, <code>←</code> back, <code>Esc</code> end</li></ul>" },
-    { id: "cli", t: "Command line", h: "<pre class='src'>pmap ui [folder]                open the map: the last project, or choose one\npmap html [folder] -o map.html  save the map as one self-contained page\npmap scan .                     save the map to .pmap/actual.json\npmap context .                  a short overview for an AI agent\npmap find NAME                  where a class or function is\npmap show REF                   one item: location, links, users\npmap source REF                 the code of one function or class\npmap check .                    compare the code with design.yaml\npmap stale .                    what changed since the last scan\npmap connect | disconnect       AI agents\npmap shortcut [--remove]        the Method Project Map app shortcut</pre>" },
+    { id: "cli", t: "Command line", h: "<pre class='src'>pmap ui [folder]                open the map: the last project, or choose one\npmap html [folder] -o map.html  save the map as one self-contained page\npmap scan .                     save the map to .pmap/actual.json\npmap context .                  a short overview for an AI agent\npmap find NAME                  where a class or function is\npmap show REF                   one item: location, links, users\npmap source REF                 the code of one function or class\npmap check .                    compare with design.yaml; also lists gaps between languages\npmap stale .                    what changed since the last scan\npmap connect | disconnect       AI agents\npmap shortcut [--remove]        the Method Project Map app shortcut</pre>" },
     { id: "trouble", t: "If something goes wrong", h: "<ul><li><b>“stopped — open Method Project Map again”</b> — the map stopped after its tab stayed closed or idle; start it again.</li><li><b>“No source files”</b> — choose the project folder itself, not the folder above or next to it.</li><li><b>macOS asks for access to files</b> — allow it once: the shortcut needs to read the project folder, especially on an external disk.</li><li><b>A file is missing from the map</b> — look under “Files the map could not read” in the project panel (a syntax error) or check <code>.pmapignore</code>.</li><li><b>An expected link is missing</b> — turn on <b>Possible links</b>; calls through variables or <code>getattr</code> may stay unresolved.</li></ul>" },
   ],
 });
@@ -419,6 +441,7 @@ Object.assign(L.ru, {
     crumbs: { t: "Где вы находитесь", b: "Путь назад: обзор › пакет › файл. Клавиша Esc делает то же самое." },
     search: { t: "Поиск", b: "Введите имя класса, функции или файла. Клавиша / в любом месте переносит сюда." },
     maybe: { t: "Возможные связи", b: "По умолчанию карта показывает только связи, доказанные по коду. Включите, чтобы видеть и вероятные (пунктиром), — их стоит проверить в коде." },
+    bridges: { t: "Мосты между языками", b: "Этот проект вызывает код одного языка из другого: каналы платформы, FFI, передача управления системе. Такие вызовы не проверяет ни один компилятор, поэтому карта перечисляет их здесь, пропуски первыми, и рисует фиолетовым." },
     design: { t: "Архитектура", b: "У этого проекта есть design.yaml: переключитесь на «Архитектуру», чтобы увидеть, какие зависимости разрешены замыслом и где код нарушает правила." },
     connect: { t: "Подключите ИИ", b: "Даёт Claude Code / Codex карту каждого проекта с кодом, который они открывают, — чтобы им приходилось читать меньше кода. Подключается одним нажатием и так же отключается." },
     lang: { t: "Язык", b: "Переключение между русским и английским." },
@@ -429,19 +452,25 @@ Object.assign(L.ru, {
     { id: "langs", t: "Языки", h: "<p><b>Python</b> работает сразу. Для <b>TypeScript / JavaScript</b> (ES-модули, CommonJS, JSX), <b>Go</b>, <b>Java</b>, <b>Kotlin</b>, <b>C#</b>, <b>Swift</b>, <b>Dart / Flutter</b>, <b>Rust</b> и <b>C / C++</b> (Win32, C++/WinRT) нужны грамматики tree-sitter: один раз выполните <code>pmap langs install</code> (установщик делает это сам). В одном проекте языки можно смешивать; панель проекта показывает их и говорит, какие ещё не на карте.</p><p>Правила уверенности везде одинаковые. В типизированных языках объявленный тип проверяет компилятор, поэтому вызов через переменную или поле с классом проекта — <i>подтверждённая</i> связь, если ни один подкласс не переопределяет метод; через интерфейс, протокол или трейт, либо когда подкласс его переопределяет, — <i>возможная</i>. У вызовов в библиотеки связей нет: зависимость уже записана импортом.</p>" },
     { id: "levels", t: "Три уровня", h: "<p><b>Обзор</b> — каждая карточка это пакет (папка с кодом). <b>Пакет</b> — каждая карточка это файл пакета. <b>Файл</b> — три колонки: кто использует файл, что в нём, что использует он.</p><ul><li><b>Клик</b> по карточке выбирает её и показывает связи.</li><li><b>Двойной клик</b> или кнопка <b>Открыть</b> — зайти внутрь.</li><li>Путь вверху, <code>Esc</code> или <code>Backspace</code> — на уровень выше.</li><li>Дерево <b>Файлы</b> слева сразу открывает любой пакет, файл, класс или функцию.</li></ul>" },
     { id: "layers", t: "Слои", h: "<p>Карточки разложены по зависимостям. <b>Верхний слой</b> пользуется слоями ниже, а его самого никто не использует: точки входа, командная строка, тесты. <b>Фундамент</b> внизу ни от чего на экране не зависит: модели, утилиты, ядро, на котором всё построено. Промежуточные слои опираются на те, что под ними.</p><p>Если код снизу вдруг пользуется кодом сверху, к архитектуре обычно стоит присмотреться.</p>" },
-    { id: "colors", t: "Стрелки и цвета", h: "<ul><li><span style='color:var(--uses)'>Синие</span> — что использует выбранное.</li><li><span style='color:var(--usedby)'>Зелёные</span> — кто использует выбранное.</li><li>Карточка в <span style='color:var(--warn)'>красной</span> рамке и использует выбранное, и используется им (цикл).</li><li>Жёлтый пунктир — возможная связь (см. ниже).</li><li>В виде «Архитектура»: зелёным — разрешено и используется, красным — не разрешено, точками — разрешено, но не используется.</li></ul><p>Стрелки рисуются только для выбранной карточки, чтобы картинка оставалась читаемой. Клик по пустому месту снимает выбор.</p>" },
+    { id: "colors", t: "Стрелки и цвета", h: "<ul><li><span style='color:var(--uses)'>Синие</span> — что использует выбранное.</li><li><span style='color:var(--usedby)'>Зелёные</span> — кто использует выбранное.</li><li>Карточка в <span style='color:var(--warn)'>красной</span> рамке и использует выбранное, и используется им (цикл).</li><li>Жёлтый пунктир — возможная связь (см. ниже).</li><li><span style='color:var(--bridge)'>Фиолетовые</span> — связь между языками: канал платформы, FFI, передача управления системе (см. ниже).</li><li>В виде «Архитектура»: зелёным — разрешено и используется, красным — не разрешено, точками — разрешено, но не используется.</li></ul><p>Стрелки рисуются только для выбранной карточки, чтобы картинка оставалась читаемой. Клик по пустому месту снимает выбор.</p>" },
     { id: "trust", t: "Подтверждённые и возможные связи", h: "<ul><li><span class='pill ok'>подтверждена</span> — доказана по коду, например прямой импорт или вызов импортированной функции. На неё можно полагаться.</li><li><span class='pill maybe'>возможна</span> — вероятна, но не доказана: вызов через параметр с аннотацией типа, метод, который может переопределить подкласс, переменная, которой присваивают в нескольких местах. По умолчанию скрыты — включите <b>Возможные связи</b>.</li><li><b>Вызовы, которые карта не смогла определить</b>, перечислены в боковой панели. О них карта ничего не утверждает: смотрите код.</li></ul><p>Карта не видит вызовов из кода вне репозитория, подмены функций на лету (monkey-patching) и обращений по имени через <code>getattr</code>.</p>" },
+    { id: "bridges", t: "Мосты между языками", h: "<p>Некоторые вызовы переходят из одного языка в другой, и их не проверяет ни один компилятор: каналы платформы Flutter (<code>invokeMethod('connect')</code> в Dart попадает в обработчик этого канала на Swift, Kotlin или C++), функции C, которые вызывают через FFI или JNI (Rust, C), Pigeon (до реализации сгенерированного API), flutter_rust_bridge, UniFFI и команды Tauri, а также передача управления через систему — Apple NetworkExtension (<code>startVPNTunnel</code> → <code>PacketTunnelProvider.startTunnel</code>) и интенты Android, которые запускают сервис. Карта соединяет обе стороны и рисует такие связи <span style='color:var(--bridge)'>фиолетовым</span>; панель проекта перечисляет их все. <span class='pill ok'>подтверждена</span> — имена на обеих сторонах совпадают точно; <span class='pill maybe'>возможна</span> — цель выбирает система или подходят несколько целей. <b class='warn'>Пропуск</b> — метод канала, который вызывают с одной стороны, но какая-то платформа его не обрабатывает: приложение сломается там только во время работы. <code>pmap check .</code> перечисляет пропуски, а подключённые ИИ-агенты после каждой правки получают короткую заметку о том, что находится на другой стороне этих связей.</p>" },
     { id: "panel", t: "Боковая панель и поиск", h: "<p>Правая панель описывает выбранное: что это (из docstring), сигнатура, что внутри, что оно использует и кто использует его — с номерами строк. Кнопки: <b>Открыть</b>, <b>Показать код</b> (только эта функция или класс, а не весь файл) и <b>Показать в Finder / Проводнике</b>.</p><p><b>Поиск</b> (<code>/</code>) находит классы, функции, методы и файлы по имени; <code>↑ ↓</code> — выбрать результат, <code>Enter</code> — открыть.</p>" },
     { id: "projects", t: "Проекты", h: "<p>Нажмите на название проекта слева вверху: выберите папку в Finder / Проводнике, вставьте полный путь или возьмите проект из недавних. Подойдёт любая папка с кодом; домашнюю папку или диск целиком карта не откроет.</p><p>Чтобы убрать с карты сгенерированный или чужой (вендорный) код, положите в корень проекта файл <code>.pmapignore</code>: по шаблону на строку, <code>папка/</code> исключает папку целиком, <code>#</code> начинает комментарий.</p>" },
     { id: "design", t: "Архитектура (design.yaml)", h: "<p>Опишите задуманную архитектуру в файле <code>design.yaml</code> в корне проекта: подсистемы (какие папки к ним относятся) и какая подсистема может пользоваться какой. Вид <b>Архитектура</b> сверит с этим настоящий код и покажет каждую запрещённую зависимость вместе с файлом и строкой, откуда она взялась.</p><pre class='src'>subsystems:\n  - id: ui\n    name: Интерфейс\n    paths: ['app/ui/**']\n  - id: services\n    name: Бизнес-логика\n    paths: ['app/services/**']\n  - id: db\n    name: База данных\n    paths: ['app/db/**']\nallowed_dependencies:\n  - from: ui\n    to: services\n  - from: services\n    to: db</pre><p>Здесь вызов из <code>ui</code> напрямую в <code>db</code> будет показан красным. В терминале: <code>pmap check .</code>; с <code>--strict</code> проверка в CI упадёт при нарушениях.</p>" },
     { id: "ai", t: "Подключение ИИ-агентов", h: "<p><b>Подключить к ИИ</b> даёт Claude Code и/или Codex доступ к картам проектов: навык, правило, MCP-инструменты, а для Claude Code ещё и хук, который в начале каждой сессии передаёт агенту краткий обзор проекта. В наших испытаниях агент читал вдвое меньше кода, а качество исправлений не изменилось.</p><p>Меняются только файлы в вашей домашней папке, у каждого есть резервная копия; <b>Отключить</b> убирает всё обратно. В терминале: <code>pmap connect --claude</code>, <code>--codex</code> или <code>--all</code>; <code>pmap disconnect --all</code>.</p>" },
     { id: "launch", t: "Запуск и остановка", h: "<ul><li>Ярлык <b>Method Project Map</b> («Программы» на macOS, меню «Пуск» на Windows, меню приложений на Linux) или команда <code>pmap ui</code> открывает последний проект; в самый первый раз спросит папку.</li><li>Повторный запуск открывает уже работающую карту.</li><li>Карта сама останавливается примерно через 15 минут после того, как закрыли её вкладку. Если на странице написано «остановлена», просто запустите Method Project Map снова.</li><li>Статус справа вверху: <b>онлайн</b> — карта следит за изменениями файлов; <b>файл-снимок</b> — сохранённая копия, сделанная командой <code>pmap html</code>.</li></ul>" },
     { id: "keys", t: "Клавиши", h: "<ul><li><code>/</code> — поиск</li><li><code>Esc</code>, <code>Backspace</code> — на уровень выше, закрыть окно</li><li><code>↑ ↓ Enter</code> — выбрать и открыть результат поиска</li><li>В обучении: <code>→</code> далее, <code>←</code> назад, <code>Esc</code> завершить</li></ul>" },
-    { id: "cli", t: "Командная строка", h: "<pre class='src'>pmap ui [папка]                 открыть карту: последний проект или выбрать\npmap html [папка] -o map.html   сохранить карту одной самодостаточной страницей\npmap scan .                     сохранить карту в .pmap/actual.json\npmap context .                  краткий обзор для ИИ-агента\npmap find ИМЯ                   где находится класс или функция\npmap show ССЫЛКА                один элемент: где, связи, кто использует\npmap source ССЫЛКА              код одной функции или класса\npmap check .                    сверить код с design.yaml\npmap stale .                    что изменилось после последнего скана\npmap connect | disconnect       ИИ-агенты\npmap shortcut [--remove]        ярлык Method Project Map</pre>" },
+    { id: "cli", t: "Командная строка", h: "<pre class='src'>pmap ui [папка]                 открыть карту: последний проект или выбрать\npmap html [папка] -o map.html   сохранить карту одной самодостаточной страницей\npmap scan .                     сохранить карту в .pmap/actual.json\npmap context .                  краткий обзор для ИИ-агента\npmap find ИМЯ                   где находится класс или функция\npmap show ССЫЛКА                один элемент: где, связи, кто использует\npmap source ССЫЛКА              код одной функции или класса\npmap check .                    сверить код с design.yaml; заодно перечисляет пропуски между языками\npmap stale .                    что изменилось после последнего скана\npmap connect | disconnect       ИИ-агенты\npmap shortcut [--remove]        ярлык Method Project Map</pre>" },
     { id: "trouble", t: "Если что-то не так", h: "<ul><li><b>«остановлена — запустите Method Project Map снова»</b> — карта остановилась, потому что её вкладка была закрыта или долго не отвечала; запустите её снова.</li><li><b>«В папке нет файлов с кодом»</b> — выберите саму папку проекта, а не ту, что выше или рядом.</li><li><b>macOS спрашивает доступ к файлам</b> — разрешите один раз: ярлыку нужно читать папку проекта, особенно на внешнем диске.</li><li><b>Файла нет на карте</b> — посмотрите раздел «Файлы, которые карта не смогла прочитать» в панели проекта (ошибка синтаксиса) или проверьте <code>.pmapignore</code>.</li><li><b>Нет ожидаемой связи</b> — включите <b>Возможные связи</b>; вызовы через переменные или <code>getattr</code> могут остаться неопределёнными.</li></ul>" },
   ],
 });
 const LANG_NAMES = { python: "Python", typescript: "TypeScript", javascript: "JavaScript", go: "Go", java: "Java", kotlin: "Kotlin", csharp: "C#", swift: "Swift", dart: "Dart", rust: "Rust", cpp: "C / C++" };
+// the language of a file by its extension, named as in DATA.bridges (for links between languages)
+const EXT_LANG = {};
+[["Dart", "dart"], ["Swift", "swift"], ["Kotlin", "kt kts"], ["Java", "java"], ["Rust", "rs"], ["C/C++", "c h cpp cc cxx c++ hpp hh hxx h++ ipp inl"], ["TypeScript", "ts tsx mts cts"],
+  ["JavaScript", "js jsx mjs cjs"], ["Go", "go"], ["Python", "py"], ["C#", "cs"]].forEach(([name, exts]) => exts.split(" ").forEach((x) => EXT_LANG[x] = name));
+const langOf = (path) => EXT_LANG[((/\.([^./]+)$/.exec(path || "") || [])[1] || "").toLowerCase()] || "";
 function t(key, ...args) { const v = key in L[LANG] ? L[LANG][key] : L.en[key]; return typeof v === "function" ? v(...args) : v; }
 const tp = (key) => t(key)[(PROJ && PROJ.platform) || "linux"];  // phrases that name Finder / Explorer
 
@@ -478,23 +507,27 @@ function buildIndex(data, withMaybe) {
   for (const e of data.edges) {
     if (e.c !== "r" && !withMaybe) continue;
     for (const t of (e.m || [e.t])) {
-      const link = { s: e.s, t, k: e.k, c: e.m ? "i" : e.c, l: e.l, v: e.v, y: e.y };
+      const link = { s: e.s, t, k: e.k, c: e.m ? "i" : e.c, l: e.l, v: e.v, y: e.y, br: e.br };
       if (!out.has(e.s)) out.set(e.s, []); out.get(e.s).push(link);
       if (!inc.has(t)) inc.set(t, []); inc.get(t).push(link);
     }
   }
   // module- and package-level aggregation (internal code only)
-  const modDeps = new Map(), modUsers = new Map(), pkgDeps = new Map(), pkgUsers = new Map();
+  const modDeps = new Map(), modUsers = new Map(), pkgDeps = new Map(), pkgUsers = new Map(), modBr = new Map(), pkgBr = new Map();
   const add = (map, a, b, link) => { if (!map.has(a)) map.set(a, new Map()); const m = map.get(a); if (!m.has(b)) m.set(b, []); m.get(b).push(link); };
+  const note = (map, a, lang) => { if (!map.has(a)) map.set(a, new Set()); map.get(a).add(lang); };
   for (const [s, links] of out) for (const link of links) {
     const ms = modOf.get(s), mt = modOf.get(link.t); const ns = byId.get(ms), nt = byId.get(mt);
     if (!ms || !mt || ms === mt || !ns || !nt || ns.x || nt.x) continue;
     add(modDeps, ms, mt, link); add(modUsers, mt, ms, link);
     const ps = ns.g, pt = nt.g;
     if (ps !== pt && ps !== undefined && pt !== undefined && !link.y) { add(pkgDeps, ps, pt, link); add(pkgUsers, pt, ps, link); }
+    // a link between languages: each file and package notes the language on the other side
+    const ls = link.br ? langOf(ns.f) : "", lt = link.br ? langOf(nt.f) : "";
+    if (ls && lt && ls !== lt) { note(modBr, ms, lt); note(modBr, mt, ls); note(pkgBr, ps, lt); note(pkgBr, pt, ls); }
   }
   const membership = (data.design && data.design.membership) || {};
-  return { byId, kids, modOf, pkgs, labels, pkgDoc, pkgOf, out, inc, modDeps, modUsers, pkgDeps, pkgUsers, membership };
+  return { byId, kids, modOf, pkgs, labels, pkgDoc, pkgOf, out, inc, modDeps, modUsers, pkgDeps, pkgUsers, modBr, pkgBr, membership };
 }
 
 // Short package labels: drop the folder most packages share ("tallyhub/"), Java/Kotlin source roots
@@ -537,6 +570,13 @@ function pkgLabel(p) {
 function modLabel(id) { const n = IX.byId.get(id); return n && n.f ? n.f.split("/").pop() : (n ? n.q : id); }
 function isEmptyInit(id) { const n = IX.byId.get(id); return n.f.endsWith("__init__.py") && !(IX.kids.get(id) || []).length && !IX.modDeps.has(id); }
 const size = (m) => (m ? m.size : 0);
+function hasBridges() { const b = DATA && DATA.bridges; return !!(b && ((b.groups || []).length || (b.gaps || []).length)); }
+// "⇄ C/C++, Kotlin, Swift": the other languages a package or file is linked with
+function brTag(langs) {
+  if (!langs || !langs.size) return "";
+  const list = [...langs].sort().join(", ");
+  return `<span class="tag br" title="${esc(t("bridgeTagTitle", list))}">⇄ ${esc(list)}</span>`;
+}
 
 // layers: 0 = depends on nothing in the set; higher = builds on lower layers (cycles are cut)
 function layers(ids, depsOf) {
@@ -588,7 +628,8 @@ function renderOverview() {
   const ids = [...IX.pkgs.keys()].sort();
   const n = ids.length;
   $("intro").innerHTML = t("overviewIntro", pl(n, "package")) +
-    `<span class="legend"><span><i style="border-color:var(--uses)"></i>${t("uses")}</span><span><i style="border-color:var(--usedby)"></i>${t("usedBy")}</span></span>`;
+    `<span class="legend"><span><i style="border-color:var(--uses)"></i>${t("uses")}</span><span><i style="border-color:var(--usedby)"></i>${t("usedBy")}</span>` +
+    (hasBridges() ? `<span><i style="border-color:var(--bridge)"></i>${t("bridgeLegend")}</span>` : "") + `</span>`;
   $("board").innerHTML = renderBands(ids, (p) => (IX.pkgDeps.get(p) || new Map()).keys(), (p) => {
     const mods = IX.pkgs.get(p).filter((m) => !isEmptyInit(m));
     const used = size(IX.pkgUsers.get(p)), uses = size(IX.pkgDeps.get(p));
@@ -596,6 +637,7 @@ function renderOverview() {
     const tags = [];
     if (used >= Math.max(3, n * 0.33)) tags.push(`<span class="tag">${t("widelyUsed")}</span>`);
     if (!used && uses) tags.push(`<span class="tag">${t("entryPoint")}</span>`);
+    tags.push(brTag(IX.pkgBr.get(p)));
     return card("pkg:" + p, pkgLabel(p), desc, `<span>${pl(mods.length, "file")}</span><span>${t("usesN", uses)}</span><span>${t("usedByN", used)}</span>${tags.join("")}`);
   }) + wiresSvg();
   bindCards(); selectWires();
@@ -616,7 +658,7 @@ function renderPackage(p) {
 
 function moduleCard(m, extra) {
   const n = IX.byId.get(m), names = (IX.kids.get(m) || []).filter((k) => !k.n.startsWith("_")).map((k) => k.n);
-  const meta = `<span>${pl(n.b, "line")}</span><span>${t("usesN", size(IX.modDeps.get(m)))}</span><span>${t("usedByN", size(IX.modUsers.get(m)))}</span>`;
+  const meta = `<span>${pl(n.b, "line")}</span><span>${t("usesN", size(IX.modDeps.get(m)))}</span><span>${t("usedByN", size(IX.modUsers.get(m)))}</span>${brTag(IX.modBr.get(m))}`;
   const desc = n.d || (names.length ? names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") : "");
   return card(m, modLabel(m), desc, meta, extra);
 }
@@ -673,14 +715,16 @@ function renderModule(m) {
     const shown = entries.slice(0, 40);
     const html = shown.map(([om, ls, f]) => {
       const node = IX.byId.get(om);
-      // which names of this file they use (left), or which names this file uses there (right); a bare import otherwise
-      const ids = ls.filter((x) => x.focus).map((x) => (side === "in" ? x.here : x.there));
+      // which names of this file they use (left), or which names this file uses there (right); a bare import otherwise;
+      // links between languages say how they are made: "channel app.vpn/control: connect, status"
+      const focused = ls.filter((x) => x.focus), br = bridgeText(focused.filter((x) => x.link.br).map((x) => x.link.br));
+      const ids = focused.filter((x) => !x.link.br).map((x) => (side === "in" ? x.here : x.there));
       const names = [...new Set(ids.filter((id) => (IX.byId.get(id) || {}).k !== "module").map(shortName))];
-      const via = names.length ? t("usesPrefix") + names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") : (side === "in" ? t("importsThisFile") : t("importsIt"));
+      const via = [br, names.length ? t("usesPrefix") + names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") : br ? "" : (side === "in" ? t("importsThisFile") : t("importsIt"))].filter(Boolean).join(" · ");
       const title = node.x ? node.q : modLabel(om);
       const sub = node.x ? t("externalLib") : pkgLabel(node.g);
-      return `<div class="card${f ? "" : " dim"}" data-id="${esc(om)}" data-side="${side}"><div class="t">${esc(title)}</div><div class="d">${esc(sub)}</div>` +
-        (f ? `<div class="via">${esc(trunc(via, 90))}</div>` : "") + `</div>`;
+      return `<div class="card${f ? "" : " dim"}${ls.some((x) => x.link.br) ? " br" : ""}" data-id="${esc(om)}" data-side="${side}"><div class="t">${esc(title)}</div><div class="d">${esc(sub)}</div>` +
+        (f ? `<div class="via${br ? " br" : ""}"${via.length > 90 ? ` title="${esc(via)}"` : ""}>${esc(trunc(via, 90))}</div>` : "") + `</div>`;
     }).join("");
     return (html + (entries.length > shown.length ? `<div class="more">${t("more", entries.length - shown.length)}</div>` : "") + libCard) || `<div class="muted">${t("nothing")}</div>`;
   };
@@ -703,15 +747,28 @@ function renderModule(m) {
     el.ondblclick = () => openNode(el.dataset.id);
   });
   if (selSym) {
-    const anchor = `[data-sym="${cssEsc(selSym)}"]`;
-    for (const [om, ls] of users) if (ls.some((x) => x.focus)) S.wires.push({ a: `.card[data-id="${cssEsc(om)}"][data-side="in"]`, b: anchor, cls: "usedby", raw: true });
-    for (const [om, ls] of deps) if (ls.some((x) => x.focus)) S.wires.push({ a: anchor, b: `.card[data-id="${cssEsc(om)}"][data-side="out"]`, cls: ls.some((x) => x.focus && x.link.c === "r") ? "uses" : "maybe", raw: true });
+    const anchor = `[data-sym="${cssEsc(selSym)}"]`, bridged = (ls) => ls.some((x) => x.focus && x.link.br);
+    for (const [om, ls] of users) if (ls.some((x) => x.focus)) S.wires.push({ a: `.card[data-id="${cssEsc(om)}"][data-side="in"]`, b: anchor, cls: bridged(ls) ? "bridge" : "usedby", raw: true });
+    for (const [om, ls] of deps) if (ls.some((x) => x.focus)) S.wires.push({ a: anchor, b: `.card[data-id="${cssEsc(om)}"][data-side="out"]`, cls: bridged(ls) ? "bridge" : ls.some((x) => x.focus && x.link.c === "r") ? "uses" : "maybe", raw: true });
   }
 }
 
 function linkCount(id) {
   const a = (IX.inc.get(id) || []).length, b = (IX.out.get(id) || []).length;
   return a || b ? t("inOut", a, b) : "";
+}
+// how links between languages are made: "channel app.vpn/control: connect, status; C ABI (FFI): vpn_core_start"
+function bridgeText(brs) {
+  const groups = new Map();
+  for (const b of brs) {
+    const chan = /channel$|^pigeon$/.test(b.v), key = b.v + (chan ? " " + b.n : "");
+    if (!groups.has(key)) groups.set(key, { b, chan, items: new Set() });
+    groups.get(key).items.add(chan ? b.m : b.n);
+  }
+  return [...groups.values()].map(({ b, chan, items }) => {
+    const list = [...items].filter(Boolean).sort().join(", ");
+    return (t("vias")[b.v] || b.v) + (chan ? " " + (b.n === "?" ? t("nameNotFound") : b.n) : "") + (list ? ": " + list : "");
+  }).join("; ");
 }
 function shortName(id) { const n = IX.byId.get(id); if (!n) return id; if (n.k === "module") return modLabel(id); const p = IX.byId.get(n.p); return p && p.k === "class" ? p.n + "." + n.n : n.n; }
 function descendants(id) { const out = []; const walk = (x) => (IX.kids.get(x) || []).forEach((c) => { out.push(c.id); walk(c.id); }); walk(id); return out; }
@@ -723,14 +780,14 @@ function wiresSvg() { return `<svg id="wires"></svg>`; }
 
 function selectWires() {
   const sel = S.sel; if (!sel) return;
-  const s = S.scope;
+  const s = S.scope, kind = (ls, cls) => (ls.some((l) => l.br) ? "bridge" : cls);  // links between languages are violet
   if (s.type === "root" && sel.startsWith("pkg:")) {
     const p = sel.slice(4);
-    for (const q of (IX.pkgDeps.get(p) || new Map()).keys()) S.wires.push({ a: sel, b: "pkg:" + q, cls: "uses" });
-    for (const q of (IX.pkgUsers.get(p) || new Map()).keys()) S.wires.push({ a: "pkg:" + q, b: sel, cls: "usedby" });
+    for (const [q, ls] of IX.pkgDeps.get(p) || new Map()) S.wires.push({ a: sel, b: "pkg:" + q, cls: kind(ls, "uses") });
+    for (const [q, ls] of IX.pkgUsers.get(p) || new Map()) S.wires.push({ a: "pkg:" + q, b: sel, cls: kind(ls, "usedby") });
   } else if ((s.type === "pkg" || s.type === "sub") && IX.byId.has(sel)) {
-    for (const [q, ls] of IX.modDeps.get(sel) || new Map()) S.wires.push({ a: sel, b: q, cls: ls.some((l) => l.c === "r") ? "uses" : "maybe" });
-    for (const [q, ls] of IX.modUsers.get(sel) || new Map()) S.wires.push({ a: q, b: sel, cls: ls.some((l) => l.c === "r") ? "usedby" : "maybe" });
+    for (const [q, ls] of IX.modDeps.get(sel) || new Map()) S.wires.push({ a: sel, b: q, cls: kind(ls, ls.some((l) => l.c === "r") ? "uses" : "maybe") });
+    for (const [q, ls] of IX.modUsers.get(sel) || new Map()) S.wires.push({ a: q, b: sel, cls: kind(ls, ls.some((l) => l.c === "r") ? "usedby" : "maybe") });
   }
 }
 
@@ -757,7 +814,7 @@ function drawWires() {
   markSelected();
   const board = $("board"), box = board.getBoundingClientRect();
   svg.setAttribute("width", board.scrollWidth); svg.setAttribute("height", board.scrollHeight);
-  const color = { uses: "uses", usedby: "usedby", warn: "warn", maybe: "maybe", unused: "muted" };
+  const color = { uses: "uses", usedby: "usedby", warn: "warn", maybe: "maybe", unused: "muted", bridge: "bridge" };
   svg.innerHTML = "<defs>" + Object.keys(color).map((c) =>
     `<marker id="ar-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--${color[c]})"/></marker>`).join("") + "</defs>";
   const find = (key, raw) => raw ? board.querySelector(key) : board.querySelector(`.card[data-id="${cssEsc(key)}"]`);
@@ -878,17 +935,32 @@ function renderTree() {
   }
 }
 
-function linkLabel(c, v) {
+function linkLabel(c, v, br) {
   if (v) return `<span class="pill warn" title="${t("notAllowedTitle")}">${t("notAllowed")}</span>`;
-  return c === "r" ? `<span class="pill ok" title="${t("confirmedTitle")}">${t("confirmed")}</span>` : `<span class="pill maybe" title="${t("possibleTitle")}">${t("possible")}</span>`;
+  return c === "r" ? `<span class="pill ok" title="${t(br ? "brConfirmedTitle" : "confirmedTitle")}">${t("confirmed")}</span>` : `<span class="pill maybe" title="${t(br ? "brPossibleTitle" : "possibleTitle")}">${t("possible")}</span>`;
 }
 function nodeLink(id) { const n = IX.byId.get(id); const label = n ? (n.k === "module" ? (n.f || n.q) : n.q) : id; return n && !n.x ? `<a data-goto="${esc(id)}">${esc(label)}</a>` : `<span class="muted">${esc(label)} ${t("library")}</span>`; }
+// path:line of a file in the project (long paths as first/…/last); a link that opens the file when the map has it
+function fileRef(path, line) {
+  const id = "mod:" + path, parts = path.split("/"), label = (parts.length > 3 ? `${parts[0]}/…/${parts[parts.length - 1]}` : path) + (line ? ":" + line : "");
+  return IX.byId.has(id) ? `<a data-goto="${esc(id)}" title="${esc(path)}">${esc(label)}</a>` : `<span title="${esc(path)}">${esc(label)}</span>`;
+}
+function fileRefAt(at) { const i = (at || "").lastIndexOf(":"); return !at ? "" : i > 0 ? fileRef(at.slice(0, i), at.slice(i + 1)) : fileRef(at, ""); }
+// a link between languages: via channel app.vpn/control "connect" → macos/Runner/VpnChannel.swift:24
+function brLine(b) {
+  return `<div class="brl">${t("brVia", esc(b.v), esc(b.n === "?" ? t("nameNotFound") : b.n || ""), b.m ? esc(b.m) : "")}${b.to && b.to[0] ? " → " + fileRef(b.to[0], b.to[1]) : ""}</div>`;
+}
 function linkList(list, side) {
   if (!list || !list.length) return `<div class="muted">${t("nothing")}</div>`;
   const rows = new Map();
-  for (const l of list) { const other = side === "out" ? l.t : l.s, key = other + l.k + l.c; const r = rows.get(key) || { other, l, lines: [] }; if (l.l) r.lines.push(l.l); rows.set(key, r); }
-  return [...rows.values()].slice(0, 60).map(({ other, l, lines }) => `<div>${linkLabel(l.c, l.v)}<span class="pill">${t("linkKinds")[l.k] || l.k}</span>${nodeLink(other)}${lines.length ? ` <span class="ln">${t("lineN", [...new Set(lines)].slice(0, 5).join(", "))}</span>` : ""}</div>`).join("") +
+  for (const l of list) { const other = side === "out" ? l.t : l.s, key = other + l.k + l.c; const r = rows.get(key) || { other, l, lines: [], brs: new Map() }; if (l.l) r.lines.push(l.l); if (l.br) r.brs.set(JSON.stringify(l.br), l.br); rows.set(key, r); }
+  return [...rows.values()].slice(0, 60).map(({ other, l, lines, brs }) => `<div>${linkLabel(l.c, l.v, brs.size)}<span class="pill">${t("linkKinds")[l.k] || l.k}</span>${nodeLink(other)}${lines.length ? ` <span class="ln">${t("lineN", [...new Set(lines)].slice(0, 5).join(", "))}</span>` : ""}${[...brs.values()].slice(0, 5).map(brLine).join("")}</div>`).join("") +
     (rows.size > 60 ? `<div class="muted">${t("more", rows.size - 60)}</div>` : "");
+}
+// "⇄ channel, C ABI (FFI)" when some links between two packages cross languages
+function viaPill(links) {
+  const vias = [...new Set(links.filter((l) => l.br).map((l) => t("vias")[l.br.v] || l.br.v))];
+  return vias.length ? ` <span class="pill br">⇄ ${esc(vias.join(", "))}</span>` : "";
 }
 
 function renderDetails() {
@@ -907,6 +979,8 @@ function renderDetails() {
   if (parent && parent.k === "class") h += `<h3>${t("partOf")}</h3><div class="list"><div>${nodeLink(parent.id)}</div></div>`;
   if (kids.length) h += `<h3>${t("contains", kids.length)}</h3><div class="list">${kids.slice(0, 80).map((k) => `<div>${k.k === "class" ? "◆" : "ƒ"} ${nodeLink(k.id)} <span class="ln">${t("lineN", k.a)}</span></div>`).join("")}</div>`;
   h += `<h3>${t("usesH")}</h3><div class="list">${linkList(IX.out.get(id), "out")}</div><h3>${t("usedByH")}</h3><div class="list">${linkList(IX.inc.get(id), "in")}</div>`;
+  if (n.gp) h += n.gp.map(([name, m, missing, path, line]) =>
+    `<div class="warn">${t("gapHere", esc(name), esc(m), esc(missing), path ? fileRef(path, line) : "")}</div>`).join("");
   if (n.uc) h += `<h3>${t("unresolvedCalls", n.uc)}</h3><div class="path">${esc(n.u.join(", "))}${n.uc > n.u.length ? " …" : ""}</div>`;
   const canOpen = !(S.scope.type === "module" && (S.scope.id === id || IX.modOf.get(id) === S.scope.id));
   const actions = (canOpen ? `<button class="btn primary" id="openBtn">${t("open")}</button>` : "") +
@@ -923,7 +997,7 @@ function renderDetails() {
 
 function packageDetails(p) {
   const mods = (IX.pkgs.get(p) || []).filter((m) => !isEmptyInit(m));
-  const rows = (map) => map && map.size ? [...map.entries()].sort((a, b) => b[1].length - a[1].length).map(([q, l]) => `<div><a data-pkg="${esc(q)}">${esc(pkgLabel(q))}</a> <span class="ln">${t("nLinks", l.length)}</span></div>`).join("") : `<div class="muted">${t("nothing")}</div>`;
+  const rows = (map) => map && map.size ? [...map.entries()].sort((a, b) => b[1].length - a[1].length).map(([q, l]) => `<div><a data-pkg="${esc(q)}">${esc(pkgLabel(q))}</a> <span class="ln">${t("nLinks", l.length)}</span>${viaPill(l)}</div>`).join("") : `<div class="muted">${t("nothing")}</div>`;
   const openable = !(S.scope.type === "pkg" && S.scope.id === p);
   const actions = (openable ? `<button class="btn primary" data-open="pkg:${esc(p)}">${t("openPackage")}</button>` : "") +
     (LIVE ? `<button class="btn" data-reveal-path="${esc(p)}">${esc(tp("showIn"))}</button>` : "");
@@ -967,9 +1041,29 @@ function overview() {
   if (langs.length) h += `<h3>${t("languagesH")}</h3><div class="list">` + langs.sort((a, b) => b[1].files - a[1].files).map(([k, v]) =>
     `<div>${esc(LANG_NAMES[k] || k)} <span class="ln">${pl(v.files, "file")}</span>${v.mapped ? "" : ` <span class="pill warn">${t("notMapped")}</span>`}</div>`).join("") +
     (langs.some(([, v]) => !v.mapped) ? `<div class="muted">${t("notMappedHint")}</div>` : "") + "</div>";
+  h += bridgesSection();
   if (DATA.errors.length) h += `<h3 class="warn">${t("unreadable", DATA.errors.length)}</h3><div class="list">${DATA.errors.map((e) => `<div class="path">${esc(e.path)} — ${esc(e.kind)}</div>`).join("")}</div>`;
   h += `<h3>${t("startHere")}</h3><div class="muted">${t("startText")}</div>`;
   return h;
+}
+
+// links between languages in the project panel: gaps first, then one row per channel or kind of link
+function bridgesSection() {
+  const B = DATA.bridges || {}, gaps = B.gaps || [], groups = B.groups || [];
+  if (!gaps.length && !groups.length) return "";
+  const name = (n) => esc(n === "?" ? t("nameNotFound") : n);
+  const items = (list) => {
+    const shown = [];
+    for (const x of list) { if (shown.length >= 8 || (shown.length && shown.join(", ").length + x.length > 150)) break; shown.push(x); }
+    return shown.join(", ") + (list.length > shown.length ? ", " + t("more", list.length - shown.length) : "");
+  };
+  return `<div id="bridges"><h3>${t("bridgesH")}</h3><div class="list">` +
+    gaps.slice(0, 30).map((g) => `<div class="warn">${t("gapLine", name(g.name), esc(g.method), esc(g.from), fileRefAt(g.at), esc(g.missing), fileRefAt(g.to))}</div>`).join("") +
+    (gaps.length > 30 ? `<div class="warn">${t("more", gaps.length - 30)}</div>` : "") +
+    groups.slice(0, 20).map((g) => `<div><span class="pill br">${esc(t("vias")[g.via] || g.via)}</span>${g.name ? `<b>${name(g.name)}</b>` : ""}` +
+      `<span class="blk">${esc(g.dirs.map(([a, bs]) => `${a} → ${bs.join(", ")}`).join("; "))}</span><span class="blk ln">${esc(items(g.items.filter(Boolean)))}</span></div>`).join("") +
+    (groups.length > 20 ? `<div class="muted">${t("more", groups.length - 20)}</div>` : "") +
+    `<div class="muted">${t("bridgesHint")}</div></div></div>`;
 }
 
 function bindLinks(box) {
@@ -1132,6 +1226,7 @@ function tourSteps() {
     { key: "crumbs", sel: "#crumbs", skip: !topMod },
     { key: "search", sel: ".search", enter: root },
     { key: "maybe", sel: "#maybe" },
+    { key: "bridges", sel: "#bridges", skip: !hasBridges(), enter: root },
     { key: "design", sel: "#view", skip: !DATA.design },
     { key: "connect", sel: "#connectBtn" },
     { key: "lang", sel: "#langBtn" },

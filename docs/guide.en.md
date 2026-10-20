@@ -115,6 +115,20 @@ The map never presents a guess as a fact. Every link has a confidence level:
 
 The analysis is static and closed-world: it does not see calls from code outside the repository, functions replaced at run time (monkey-patching) or lookups by name with `getattr`.
 
+### Links between languages
+
+A mobile or desktop app often spans several languages: a Flutter UI in Dart, Swift for Apple platforms, Kotlin or Java for Android, C++ for Windows, a Rust core. They call each other through **names no compiler checks**: a platform-channel name and method name, a C symbol, a JNI function name. The map links both sides:
+
+- **Flutter platform channels**: a Dart `invokeMethod('connect')` goes to the branch that handles `"connect"` in Swift (`case "connect":`), Kotlin (`"connect" ->`), Java and C++ (`method_name() == "connect"`); native code calling back into Dart, event channels (`receiveBroadcastStream` to `onListen`) and message channels too.
+- **C ABI (FFI)**: `dart:ffi` lookups and `@Native`, and calls from Swift, C/C++ and Go, go to the `#[no_mangle]` Rust function or the C definition with that symbol.
+- **JNI**: Kotlin `external fun` and Java `native` methods go to their `Java_…` functions.
+- **Generated bindings**: Pigeon (a call through the generated Dart API goes to the app's Swift, Kotlin or Java implementation), flutter_rust_bridge, UniFFI, Tauri commands.
+- **System hand-offs** (possible links, the system decides): NetworkExtension `startVPNTunnel` to the tunnel provider's `startTunnel`, Android `startService(Intent(…))` to the service's `onStartCommand`.
+
+In the map these are ordinary links marked as bridges, with where they land on the other side: packages of different languages are joined on the overview, the side panel says *via channel app.vpn/control "connect" → macos/Runner/VpnChannel.swift:24*, and the overview panel lists every channel and kind of link.
+
+A **gap** is a channel method called from one side that a platform handling the channel does not handle — for example, Dart asks for `status` and the Kotlin handler has no branch for it. On that platform the call fails at run time. A call inside a platform check (`if (Platform.isIOS)`, `TargetPlatform.android`) counts only for the platforms it names. Gaps are shown first in the overview panel and listed by `pmap check .`.
+
 ### Side panel
 
 The right panel describes the selection: what it is (the first line of its docstring), its signature, what it contains, what it uses and who uses it, with line numbers. Buttons:
@@ -238,6 +252,10 @@ Only confirmed links count. Imports made only for type checking (`if TYPE_CHECKI
 
 A working example lives in [`examples/`](../examples): `pmap serve examples/toy_project --design examples/design.yaml --open` shows one deliberate violation (`ui → db`).
 
+### Gaps between languages in CI
+
+`pmap check .` also checks the links between languages, with or without a `design.yaml`: every channel method that some platform does not handle is reported with the file and line on both sides, and `--strict` makes the command fail on it. Without a design, only this part runs.
+
 ### An mDm scheme instead of design.yaml
 
 A project designed in [mDm](https://method-network.com/) has `PROJECT.mdm` in its root: a functional scheme of functions and the objects they take (`из:`) and give (`в:`). Once a function is built, the coding agent writes under it where it lives:
@@ -262,11 +280,12 @@ Agents waste much of their context reading files just to find their way. Method 
 | | Claude Code | Codex |
 |---|---|---|
 | Skill `project-map` (how to use the map) | `~/.claude/skills/project-map/` | `~/.codex/skills/project-map/` |
-| Overview of the project at the start of each session | `SessionStart` hook in `~/.claude/settings.json` | rule in `~/.codex/AGENTS.md` |
+| Overview of the project at the start of each session | `SessionStart` hook in `~/.claude/settings.json` | `SessionStart` hook in `~/.codex/hooks.json` |
+| Note after each edit: what depends on the changed code | `PostToolUse` hook in `~/.claude/settings.json` | `PostToolUse` hook in `~/.codex/hooks.json` |
 | Rule to look at the map before reading files | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` |
 | MCP server `pmap` | registered with `claude mcp add --scope user` | `~/.codex/config.toml` |
 
-Every change is a marked block; each config file is backed up as `<name>.bak-pmap` before the first change. **Disconnect** (or `pmap disconnect --all`) removes exactly these additions.
+Every change is a marked block; each config file is backed up as `<name>.bak-pmap` before the first change. **Disconnect** (or `pmap disconnect --all`) removes exactly these additions. Codex runs new hooks only after you trust them: open `/hooks` in Codex once and trust the two `pmap` hooks.
 
 The hook works only in code projects (it looks for `.git`, `pyproject.toml`, `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `*.csproj` and similar, or for a folder with Python packages). It stays silent elsewhere, in the home folder and on any error.
 
@@ -288,7 +307,18 @@ Use either the plugin or `pmap connect --claude`, not both: each adds the sessio
 
 ### What the agent gets
 
-At the start of a session, a compact overview (about 8,000 characters): packages with their purpose and dependencies, then files with one-line descriptions, then signatures — the most widely used code first. Then precise queries:
+**After each edit**, a short note on what depends on the code the agent just changed: callers in other files and the other side of every link between languages, with file and line. For an edit inside a function body it is one line; when the edit touches a declaration's head, or deletes it, every user is listed. It says nothing when nothing outside the file depends on the change and never repeats itself within a session:
+
+```text
+Method Project Map — code elsewhere depends on what you just changed; keep it in step:
+vpn_core_start (rust/src/ffi.rs:15)
+  ← windows/runner/vpn_channel.cpp:18  VpnChannel::HandleMethodCall  (C/C++, C ABI vpn_core_start)
+  ← macos/Runner/TunnelController.swift:8  TunnelController.connect  (Swift, C ABI vpn_core_start)
+```
+
+The note comes from a cached map (`~/.pmap/cache`), refreshed in the background after every edit, so it costs well under a second.
+
+**At the start of a session**, a compact overview (about 4,000 characters): languages, the links between them and any gaps, then packages with their purpose and dependencies, files with one-line descriptions and signatures — the most widely used code first. In a large project that has no map yet, the map is built in the background and the overview arrives with the next session. Then precise queries:
 
 | Need | Command | MCP tool |
 |---|---|---|
@@ -304,7 +334,7 @@ At the start of a session, a compact overview (about 8,000 characters): packages
 
 ### Does it help?
 
-On a 29,000-line project with hidden tests, Codex fixed 60 of 60 bugs both with and without the map. With the overview in the prompt it read **0.55×** as much code (95% CI 0.49–0.59) and wrote 0.85× as many output tokens; total input tokens were 0.93× (CI 0.83–1.02, not significant). Agents that were only *told* about the commands almost never used them, which is why the overview is delivered at session start. Details: [bench/reports](../bench/reports).
+On a 29,000-line project with hidden tests, Codex fixed 60 of 60 bugs both with and without the map. With the overview in the prompt it read **0.55×** as much code (95% CI 0.49–0.59) and wrote 0.85× as many output tokens; total input tokens were 0.93× (CI 0.83–1.02, not significant). So the overview alone saves reading, not money, and finding the right file was not the hard part: the agent opened it with its second command either way. Agents that were only *told* about the commands almost never used them, in the benchmark and in real sessions. That is why the map now speaks up after edits instead, where a change can stop halfway: in another file, or on the other side of a link between languages. A benchmark of tasks that cross languages is next. Details: [bench/reports](../bench/reports).
 
 ## 7. Sharing a map
 
@@ -341,7 +371,7 @@ All commands: `pmap <command> --help`.
 | `pmap find NAME` | find classes, functions, methods | `--repo`, `--limit` |
 | `pmap show REF` | one node with links and users | `--repo` |
 | `pmap source REF` | source of one node | `--repo`, `--context N` |
-| `pmap check FOLDER` | compare with `design.yaml` | `--design`, `--json`, `--strict`, `--include-type-only` |
+| `pmap check FOLDER` | compare with `design.yaml`; list gaps between languages | `--design`, `--json`, `--strict`, `--include-type-only` |
 | `pmap stale FOLDER` | changed since the last scan | `--json` |
 | `pmap mermaid FOLDER` | Mermaid diagram | `--level subsystem\|module`, `--design` |
 | `pmap mcp` | MCP server over stdio | `--repo` |
@@ -349,7 +379,7 @@ All commands: `pmap <command> --help`.
 | `pmap connection` | which agents are connected | |
 | `pmap shortcut` | create the app shortcut | `--remove` |
 | `pmap langs` | which language grammars are installed | `install` |
-| `pmap hook session-start` | used by the Claude Code hook | |
+| `pmap hook session-start` / `post-edit` | used by the Claude Code and Codex hooks | |
 
 ## 9. Troubleshooting
 

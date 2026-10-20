@@ -1,12 +1,12 @@
 ---
 name: project-map
-description: Navigate code repositories (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) with Method Project Map (pmap), a static, LLM-free map of packages, files, classes, functions and the call/import links between them. Use when starting work in a codebase, locating where behaviour is implemented, tracing callers and callees, or checking architecture rules — before reading many files.
+description: Navigate code repositories (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) with Method Project Map (pmap), a static, LLM-free map of packages, files, classes, functions and the call/import links between them — including links between languages that no compiler checks (Flutter platform channels, Pigeon, FFI, JNI, flutter_rust_bridge, UniFFI, Tauri). Use when starting work in a codebase, locating where behaviour is implemented, tracing callers and callees across languages, checking what a change affects, or checking architecture rules — before reading many files.
 license: MIT
 ---
 
 # Method Project Map (pmap)
 
-`pmap` reads the code statically and answers "where is it and what touches it" without reading whole files. Measured on 29k-line codebases it halves the code an agent has to read, with no loss of fix quality. Python is built in; TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C/C++ need the optional grammars (`{{PMAP}} langs` shows what is installed, `{{PMAP}} langs install` adds them).
+`pmap` reads the code statically and answers "where is it and what touches it" without reading whole files — also across languages: from a Dart `invokeMethod('connect')` to the Swift, Kotlin and C++ branches that handle it, from Swift or C++ to the Rust function behind a C symbol. Python is built in; TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust and C/C++ need the optional grammars (`{{PMAP}} langs` shows what is installed, `{{PMAP}} langs install` adds them).
 
 Command: `{{PMAP}}` (run from the repository root; `--repo <dir>` elsewhere). The same operations exist as MCP tools `pmap_overview`, `pmap_find`, `pmap_show`, `pmap_source`, `pmap_check` when the MCP server is connected.
 
@@ -28,7 +28,13 @@ Use plain text search as well when a symptom names literal strings, config keys 
 - The map never invents edges, but it cannot see code outside the repository, monkey-patching or `getattr` tricks.
 - Maps refresh themselves when files change; `{{PMAP}} stale` lists files changed since the last saved scan.
 
+## Links between languages
+
+A Flutter app reaches Swift, Kotlin and C++ through a channel name and a method name (plain strings); Dart, Swift, C++ and Kotlin reach Rust or C through symbol names (FFI, JNI), Pigeon, flutter_rust_bridge, UniFFI or Tauri commands. No compiler checks these, so a rename on one side breaks the app at run time only. The map links both sides (`show` prints `via channel app.vpn/control "connect" -> macos/Runner/VpnChannel.swift:24`), the overview lists them, and a channel method that some platform does not handle is a **gap** (`[GAP]` in the overview, `{{PMAP}} check .`). When you change one side of a link, change or check the other side in the same task.
+
 ## After changing code
+
+After each edit, a short note may appear ("Method Project Map — code elsewhere depends on what you just changed"): callers in other files and the other side of every link between languages for the declarations you touched. Read it and update or check what it names before you finish; it is silent when nothing outside the file depends on the change.
 
 If the repository has a `design.yaml`, run `{{PMAP}} check .` and fix any new *divergence* (a dependency the design does not allow) unless the task is to change the architecture.
 

@@ -426,6 +426,43 @@
         "type_only": {
           "type": "boolean",
           "description": "True for imports executed only under typing.TYPE_CHECKING (not a runtime dependency)."
+        },
+        "bridge": {
+          "type": "object",
+          "description": "A link between languages that no compiler checks (source 'pmap-bridge'): how it is made and where it lands on the other side. 'missing' marks an unresolved edge to a channel method that platform does not handle.",
+          "required": [
+            "via",
+            "name"
+          ],
+          "properties": {
+            "via": {
+              "type": "string",
+              "enum": ["channel", "event-channel", "message-channel", "pigeon", "ffi", "jni", "frb", "uniffi", "tauri",
+                       "network-extension", "android-intent"]
+            },
+            "name": {
+              "type": "string",
+              "description": "Channel name, C / JNI symbol, generated binding name or command."
+            },
+            "method": {
+              "type": ["string", "null"],
+              "description": "Channel method ('listen' for an event channel, 'send' for a message channel)."
+            },
+            "to": {
+              "type": "object",
+              "required": ["path", "line"],
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "line": {"type": "integer", "minimum": 1}
+              },
+              "additionalProperties": false
+            },
+            "missing": {
+              "type": "string",
+              "description": "The platform (language and folder) that handles the channel but not this method."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

@@ -6,6 +6,7 @@ attached to the class by the resolver, and declarations in headers give way to t
 
 from __future__ import annotations
 
+import re
 from typing import List, Optional
 
 from pmap.langs.base import (RESULT, Call, Decl, FileFacts, Import, base_type_name, end_line_of, line_of, parser_for,
@@ -285,8 +286,15 @@ def _type_text(ex: _C, node) -> str:
     return ""
 
 
+# `#ifdef __cplusplus` / `extern "C" {` / `#endif` (and the closing `}`) wraps nearly every C header; the parser
+# cannot pair a brace opened and closed under separate `#ifdef`s, so both guards are blanked (offsets are kept).
+_CPLUSPLUS_GUARD = re.compile(rb'#[ \t]*if(?:def[ \t]+__cplusplus|[ \t]+defined[ \t]*\(?[ \t]*__cplusplus[ \t]*\)?)'
+                              rb'[^\n]*\n[ \t]*(?:extern[ \t]+"C"[ \t]*\{|\})[^\n]*\n[ \t]*#[ \t]*endif[^\n]*')
+
+
 def extract(src: bytes, rel_path: str, ext: str) -> FileFacts:
     grammar = "c" if ext == ".c" else "cpp"
+    src = _CPLUSPLUS_GUARD.sub(lambda m: re.sub(rb"[^\n]", b" ", m.group(0)), src)
     tree = parser_for(grammar).parse(src)
     facts = FileFacts(rel_path=rel_path, language="c" if grammar == "c" else "cpp",
                       line_end=max(1, tree.root_node.end_point[0] + 1))

@@ -18,6 +18,9 @@ from typing import Dict, List, Optional
 
 SKILL_NAME = "project-map"
 HOOK_MARKER = "hook session-start"
+EDIT_HOOK_MARKER = "hook post-edit"
+# Claude Code reads `|`-separated tool names, Codex a regex in which `Edit|Write` also stand for apply_patch.
+EDIT_TOOLS = "Edit|Write|MultiEdit|apply_patch"
 MD_START, MD_END = "<!-- pmap:start -->", "<!-- pmap:end -->"
 TOML_START, TOML_END = "# >>> pmap (managed by `pmap connect`; remove with `pmap disconnect`)", "# <<< pmap"
 
@@ -157,21 +160,46 @@ def _load_json(path: Path) -> Dict:
     return json.loads(text) if text else {}
 
 
+def _is_pmap_hook(handler: Dict) -> bool:
+    command = str(handler.get("command", ""))
+    return "pmap" in command and (HOOK_MARKER in command or EDIT_HOOK_MARKER in command)
+
+
 def _strip_pmap_hooks(settings: Dict) -> bool:
-    """Remove our SessionStart entries; returns True if something was removed."""
+    """Remove our SessionStart and PostToolUse entries; returns True if something was removed."""
     hooks = settings.get("hooks") or {}
-    entries = hooks.get("SessionStart") or []
-    kept = [e for e in entries if not any(HOOK_MARKER in str(h.get("command", "")) and "pmap" in str(h.get("command", ""))
-                                          for h in e.get("hooks", []))]
-    if len(kept) == len(entries):
-        return False
-    if kept:
-        hooks["SessionStart"] = kept
-    else:
-        hooks.pop("SessionStart", None)
+    removed = False
+    for event in ("SessionStart", "PostToolUse"):
+        entries = hooks.get(event) or []
+        kept = [e for e in entries if not any(_is_pmap_hook(h) for h in e.get("hooks", []))]
+        if len(kept) == len(entries):
+            continue
+        removed = True
+        if kept:
+            hooks[event] = kept
+        else:
+            hooks.pop(event, None)
     if not hooks:
         settings.pop("hooks", None)
-    return True
+    return removed
+
+
+def _add_pmap_hooks(settings: Dict, launcher: Path) -> None:
+    """The overview at session start and the note after each edit (same JSON shape in Claude Code and Codex)."""
+    hooks = settings.setdefault("hooks", {})
+    hooks.setdefault("SessionStart", []).append({
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [{"type": "command", "command": f"{_quote(launcher)} {HOOK_MARKER}", "timeout": 30}],
+    })
+    hooks.setdefault("PostToolUse", []).append({
+        "matcher": EDIT_TOOLS,
+        "hooks": [{"type": "command", "command": f"{_quote(launcher)} {EDIT_HOOK_MARKER}", "timeout": 30}],
+    })
+
+
+def _has_hook(settings: Dict, event: str, marker: str) -> bool:
+    return any(marker in str(h.get("command", "")) for e in (settings.get("hooks") or {}).get(event, [])
+               for h in e.get("hooks", []))
 
 
 def connect_claude(launcher: Path, register_mcp: bool = True) -> List[str]:
@@ -180,13 +208,10 @@ def connect_claude(launcher: Path, register_mcp: bool = True) -> List[str]:
     settings = _load_json(settings_path)
     _backup(settings_path)
     _strip_pmap_hooks(settings)
-    settings.setdefault("hooks", {}).setdefault("SessionStart", []).append({
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [{"type": "command", "command": f"{_quote(launcher)} {HOOK_MARKER}", "timeout": 30}],
-    })
+    _add_pmap_hooks(settings, launcher)
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    report.append(f"Claude Code: session-start overview hook -> {settings_path}")
+    report.append(f"Claude Code: session-start overview and after-edit notes (hooks) -> {settings_path}")
     rules = claude_dir() / "CLAUDE.md"
     _backup(rules)
     rules.write_text(_replace_block(rules.read_text(encoding="utf-8") if rules.exists() else "", MD_START, MD_END,
@@ -216,7 +241,7 @@ def disconnect_claude() -> List[str]:
     if _strip_pmap_hooks(settings):
         _backup(settings_path)
         settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        report.append(f"Claude Code: removed session-start hook from {settings_path}")
+        report.append(f"Claude Code: removed the pmap hooks from {settings_path}")
     rules = claude_dir() / "CLAUDE.md"
     if rules.exists() and MD_START in rules.read_text(encoding="utf-8"):
         rules.write_text(_replace_block(rules.read_text(encoding="utf-8"), MD_START, MD_END, None), encoding="utf-8")
@@ -231,10 +256,10 @@ def disconnect_claude() -> List[str]:
 
 def claude_status() -> Dict:
     settings = _load_json(claude_dir() / "settings.json")
-    hook = any(HOOK_MARKER in str(h.get("command", "")) for e in (settings.get("hooks") or {}).get("SessionStart", [])
-               for h in e.get("hooks", []))
+    hook = _has_hook(settings, "SessionStart", HOOK_MARKER)
+    edit_notes = _has_hook(settings, "PostToolUse", EDIT_HOOK_MARKER)
     skill = (claude_dir() / "skills" / SKILL_NAME / "SKILL.md").exists()
-    return {"connected": skill and hook, "skill": skill, "hook": hook}
+    return {"connected": skill and hook, "skill": skill, "hook": hook, "edit_notes": edit_notes}
 
 
 # ------------------------------------------------------------------ codex
@@ -254,7 +279,10 @@ def _rule_text(launcher: Path) -> str:
     return (f"## Method Project Map\nIn code repositories, orient with Method Project Map before reading files: use the overview "
             f"injected at session start or run `{launcher} context . --max-chars 8000`, then `{launcher} find <name>`, "
             f"`{launcher} show <node-id|path>` and `{launcher} source <node-id>` (or the pmap_* MCP tools) to locate and "
-            "read only the code you need. Trust `resolved` links, verify `inferred` ones; details in the project-map skill.")
+            "read only the code you need. Trust `resolved` links, verify `inferred` ones. When the note after an edit names "
+            "code in other files or languages (a channel handler, a Rust function behind FFI or JNI, a method a platform "
+            f"does not handle), update or check it before you finish; `{launcher} check .` lists such gaps. Details in "
+            "the project-map skill.")
 
 
 def connect_codex(launcher: Path) -> List[str]:
@@ -277,6 +305,14 @@ def connect_codex(launcher: Path) -> List[str]:
     agents.write_text(_replace_block(agents.read_text(encoding="utf-8") if agents.exists() else "", MD_START, MD_END, rule),
                       encoding="utf-8")
     report.append(f"Codex: start-of-task rule -> {agents}")
+    hooks_path = codex_dir() / "hooks.json"
+    hooks = _load_json(hooks_path)
+    _backup(hooks_path)
+    _strip_pmap_hooks(hooks)
+    _add_pmap_hooks(hooks, launcher)
+    hooks_path.write_text(json.dumps(hooks, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    report.append(f"Codex: session-start overview and after-edit notes (hooks) -> {hooks_path}; Codex runs them once "
+                  "you trust them: open /hooks in Codex")
     return report
 
 
@@ -293,6 +329,14 @@ def disconnect_codex() -> List[str]:
             if start in text:
                 path.write_text(_replace_block(text, start, end, None), encoding="utf-8")
                 report.append(f"Codex: removed pmap block from {path}")
+    hooks_path = codex_dir() / "hooks.json"
+    hooks = _load_json(hooks_path)
+    if _strip_pmap_hooks(hooks):
+        if hooks:
+            hooks_path.write_text(json.dumps(hooks, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        else:
+            hooks_path.unlink()
+        report.append(f"Codex: removed the pmap hooks from {hooks_path}")
     return report or ["Codex: nothing to remove"]
 
 
@@ -300,7 +344,10 @@ def codex_status() -> Dict:
     config = codex_dir() / "config.toml"
     mcp = config.exists() and TOML_START in config.read_text(encoding="utf-8")
     skill = (codex_dir() / "skills" / SKILL_NAME / "SKILL.md").exists()
-    return {"connected": skill and mcp, "skill": skill, "mcp": mcp}
+    hooks = _load_json(codex_dir() / "hooks.json") if (codex_dir() / "hooks.json").exists() else {}
+    return {"connected": skill and mcp, "skill": skill, "mcp": mcp,
+            "hook": _has_hook(hooks, "SessionStart", HOOK_MARKER),
+            "edit_notes": _has_hook(hooks, "PostToolUse", EDIT_HOOK_MARKER)}
 
 
 # ------------------------------------------------------------------ Gemini CLI

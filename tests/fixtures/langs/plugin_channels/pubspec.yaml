@@ -1,0 +1,5 @@
+name: player
+description: Test plugin written the way real plugins are (audioplayers): helpers that take the method name, two channels per file.
+version: 1.0.0
+environment:
+  sdk: ">=3.3.0 <4.0.0"

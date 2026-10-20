@@ -1,6 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-10-20
+
+**Links between languages.** The map follows the calls that no compiler checks, so a Flutter app is no longer a set of islands, one per language:
+
+- Flutter platform channels: `MethodChannel`, `EventChannel` and `BasicMessageChannel` calls in Dart reach the Swift, Kotlin, Java and C++ branch that handles each method (`case "connect":`, `"connect" ->`, `call.method_name() == "connect"`), and native calls back into Dart; channel names may come from constants.
+- The C ABI: `dart:ffi` lookups and `@Native`, and Swift, C/C++ and Go (cgo) calls, reach `#[no_mangle]` / `export_name` Rust functions, C definitions, `@_cdecl` Swift and `//export` Go functions. A C++ call bound to a header declaration now goes to the definition in the other language.
+- Pigeon: the generated `*.g.dart` stays on the map, and a call through the generated API reaches the app's Swift, Kotlin or Java implementation of it (checked on url_launcher_ios and url_launcher_android).
+- JNI (`external fun` / `native` to `Java_…` functions), flutter_rust_bridge, UniFFI and Tauri commands.
+- The system hand-offs of VPN apps, as possible links: NetworkExtension `startVPNTunnel` to the tunnel provider's `startTunnel`, Android `startService(Intent(…, X::class.java))` to `X.onStartCommand`.
+- Real plugins wrap the call, and the map follows them: helpers that take the method name (`_call('pause', id)`, an extension `call` on `MethodChannel`), files that serve two channels (told apart by the handler each channel is given), `let method = call.method` aliases, handlers that answer every method alike. Checked on pub.dev plugins: audioplayers (Dart, Kotlin, Swift, C++) gets 73 links, all confirmed, each of its 23 channel methods reaching its branch on every platform; connectivity_plus gets 7.
+- A channel method that one platform does not handle is a **gap**, a crash at run time: `[GAP]` in the overview, listed by `pmap check .` even without a design (`--strict` fails on it).
+- In the map file such edges carry `bridge` (`via`, `name`, `method`, `to`, `missing`); the field is optional, so the format version stays 0.2.0.
+
+**Notes after edits.** `pmap hook post-edit` runs after Claude Code's Edit / Write and Codex's apply_patch. In a few lines it tells the agent what depends on the code it just changed: callers in other files and the other side of every link between languages. It says nothing when nothing outside the file depends on the change, and never repeats itself within a session. It reads a compact index cached next to the map: 0.4 s on the 1,700-file Flutter framework. `pmap connect` adds it for Claude Code (`~/.claude/settings.json`) and Codex (`~/.codex/hooks.json`; trust it once in `/hooks`); the plugin carries it too.
+
+**Session start.** Codex now gets the overview at session start as well (a `SessionStart` hook). The overview is shorter (4,000 characters instead of 7,500: the benchmark showed it costs as many tokens as it saves) and leads with the links between languages. The map is cached in `~/.pmap/cache` and reused while the files are unchanged; a large project without a map is scanned in the background instead of holding up the session.
+
+**C headers** wrapped in `#ifdef __cplusplus` / `extern "C" {` parse without errors.
 
 **mDm schemes as the design.** Without a `design.yaml`, a `PROJECT.mdm` written by [mDm](https://method-network.com/) is the design map (spec section 4.1):
 

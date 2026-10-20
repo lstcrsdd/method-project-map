@@ -1,11 +1,11 @@
 {
   "pmf_version": "0.2.0",
   "kind": "actual",
-  "generated_at": "2026-10-19T11:42:42Z",
+  "generated_at": "2026-10-20T18:23:41Z",
   "repo_root": "toy_project",
   "scanner": {
     "name": "pmap",
-    "version": "0.3.0"
+    "version": "0.5.0"
   },
   "import_roots": [
     "."

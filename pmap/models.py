@@ -103,6 +103,8 @@ class ActualEdge:
     location: EdgeLocation | None = None
     candidates: list[str] | None = None  # possible targets of an `inferred` edge
     type_only: bool = False  # import used only for type checking (`if TYPE_CHECKING:`)
+    # A link between languages (pmap/langs/bridges.py): {"via", "name", "method"?, "to": {"path", "line"}?, "missing"?}
+    bridge: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         res: dict[str, Any] = {
@@ -118,6 +120,8 @@ class ActualEdge:
             res["candidates"] = list(self.candidates)
         if self.type_only:
             res["type_only"] = True
+        if self.bridge:
+            res["bridge"] = dict(self.bridge)
         return res
 
     @classmethod
@@ -133,6 +137,7 @@ class ActualEdge:
             location=loc,
             candidates=list(data["candidates"]) if data.get("candidates") is not None else None,
             type_only=bool(data.get("type_only", False)),
+            bridge=dict(data["bridge"]) if data.get("bridge") else None,
         )
 
 

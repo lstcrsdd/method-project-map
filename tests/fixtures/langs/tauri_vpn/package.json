@@ -1,0 +1,8 @@
+{
+  "name": "tauri-vpn",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  }
+}

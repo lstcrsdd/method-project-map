@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from pmap.langs.bridges import describe as describe_bridge
 from pmap.models import ActualEdge, ActualMap, ActualNode
 
 _DEPENDENCY_KINDS = ("imports", "calls", "inherits")
@@ -139,9 +140,13 @@ def describe_node(actual: ActualMap, node: ActualNode, max_items: int = 40) -> s
                 other = "one of " + ", ".join(e.candidates)
             elif other in by_id and not incoming_side:
                 other = f"{other}  [{_loc(by_id[other])}]"
-            lines.append(f"    {e.confidence:<8} {e.kind:<8} {other}  @ {where}")
+            lines.append(f"    {e.confidence:<8} {e.kind:<8} {other}  @ {where}{describe_bridge(e)}")
         if len(known) > max_items:
             lines.append(f"    ... +{len(known) - max_items} more")
+        for e in unknown:
+            if e.bridge and e.bridge.get("missing"):
+                lines.append(f"    GAP      {e.kind:<8} @ {_edge_line(e)}{describe_bridge(e)}")
+        unknown = [e for e in unknown if not (e.bridge and e.bridge.get("missing"))]
         if unknown:
             exprs = sorted({e.target_symbol or e.to_id for e in unknown})
             shown = ", ".join(exprs[:15]) + (" ..." if len(exprs) > 15 else "")

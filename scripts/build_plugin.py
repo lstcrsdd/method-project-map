@@ -73,10 +73,17 @@ exec "$PY" -I -c "{BOOTSTRAP}" "$DIR/lib" "$@"
         "license": "MIT",
         "keywords": ["code map", "architecture", "navigation", "python", "mcp"],
     })
-    write_json(PLUGIN / "hooks" / "hooks.json", {"hooks": {"SessionStart": [{
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pmap\" hook session-start", "timeout": 30}],
-    }]}})
+    write_json(PLUGIN / "hooks" / "hooks.json", {"hooks": {
+        "SessionStart": [{
+            "matcher": "startup|resume|clear|compact",
+            "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pmap\" hook session-start",
+                       "timeout": 30}],
+        }],
+        "PostToolUse": [{  # the note after an edit: who depends on the changed code, in other files and languages
+            "matcher": "Edit|Write|MultiEdit",
+            "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pmap\" hook post-edit", "timeout": 30}],
+        }],
+    }})
     write_json(PLUGIN / ".mcp.json", {"mcpServers": {"pmap": {
         "command": "${CLAUDE_PLUGIN_ROOT}/bin/pmap",
         "args": ["mcp"],

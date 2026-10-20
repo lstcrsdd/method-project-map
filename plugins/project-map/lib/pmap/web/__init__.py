@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
 from pmap import PMF_VERSION, __version__
+from pmap.langs import bridges
 from pmap.loader import MapCache, find_design
 from pmap.models import ActualMap, DesignMap
 from pmap.query import resolve_ref, source_of
@@ -42,8 +43,14 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
     """Everything the page needs, in a compact shape (contains-edges are implied by `parent`)."""
     nodes = []
     unresolved: Dict[str, list] = {}
+    gaps: Dict[str, list] = {}  # node -> channel methods it calls that some platform does not handle
     for e in actual.edges:
         if e.kind in _DEP_KINDS and e.confidence == "unresolved":
+            if e.bridge and e.bridge.get("missing"):
+                to = e.bridge.get("to") or {}
+                gaps.setdefault(e.from_id, []).append([e.bridge.get("name"), e.bridge.get("method"),
+                                                      e.bridge["missing"], to.get("path"), to.get("line")])
+                continue
             unresolved.setdefault(e.from_id, []).append(e.target_symbol or e.to_id)
     for n in actual.nodes:
         row: Dict[str, Any] = {"id": n.id, "k": n.kind, "n": n.name, "q": n.qualified_name}
@@ -64,6 +71,8 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
         if n.id in unresolved:
             row["u"] = sorted(set(unresolved[n.id]))[:25]
             row["uc"] = len(unresolved[n.id])
+        if n.id in gaps:
+            row["gp"] = gaps[n.id]
         nodes.append(row)
 
     report = check_reflexion(design, actual) if design is not None else None
@@ -86,6 +95,10 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
             row["y"] = 1
         if (e.from_id, e.to_id) in divergent:
             row["v"] = 1
+        if e.bridge:  # a link between languages: how it is made and where it lands on the other side
+            to = e.bridge.get("to") or {}
+            row["br"] = {"v": e.bridge.get("via"), "n": e.bridge.get("name"), "m": e.bridge.get("method"),
+                         "to": [to.get("path"), to.get("line")] if to else None}
         edges.append(row)
 
     payload: Dict[str, Any] = {
@@ -97,6 +110,7 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
         "edges": edges,
         "errors": [e.to_dict() for e in actual.errors],
         "languages": actual.languages,
+        "bridges": bridges.summary(actual),
         "design": None,
     }
     if report is not None and design is not None:

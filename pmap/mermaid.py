@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from pmap.langs.bridges import summary_lines as bridge_summary
 from pmap.models import ActualMap, ActualNode, DesignMap
 from pmap.reflexion import LANGUAGE_NAMES, ReflexionReport, check_reflexion
 
@@ -207,6 +208,11 @@ def format_agent_context(
         header_lines.append(
             f"[NOT MAPPED] {len(unreadable)} unparsable file(s): " + ", ".join(e.path for e in unreadable[:5])
         )
+    links = bridge_summary(actual)
+    if links:
+        # Calls no compiler checks (channel and symbol names); an agent changing one side must change the other.
+        header_lines.append("Links between languages (`pmap show <node>` lists both ends):")
+        header_lines.extend(line if line.startswith("[GAP]") else f"- {line}" for line in links)
     if design is not None and design.source == "mdm":
         # The mDm scheme is the design: the agent sees which function lives where before reading code.
         header_lines.append("Scheme (mDm, PROJECT.mdm): functions and objects linked to code with `код:`")

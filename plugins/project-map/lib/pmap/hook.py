@@ -1,6 +1,10 @@
-"""Agent hooks. `pmap hook session-start` gives a new Claude Code session an overview of the project.
+"""Agent hooks (Claude Code and Codex).
 
-The hook must never get in the way: outside code projects, in the home folder, on huge trees or on
+- `pmap hook session-start` gives a new session an overview of the project and caches the map;
+- `pmap hook post-edit` tells the agent, right after an edit, what depends on the code it changed (pmap/hints.py);
+- `pmap hook refresh <root>` rescans a project in the background after an edit.
+
+A hook must never get in the way: outside code projects, in the home folder, on huge trees or on
 any error it prints nothing and exits 0.
 """
 
@@ -19,7 +23,9 @@ PROJECT_MARKERS = (".git", "pyproject.toml", "setup.py", "setup.cfg", "requireme
 PROJECT_SUFFIXES = (".sln", ".csproj", ".vcxproj", ".xcodeproj", ".xcworkspace")
 SKIP_DIRS = {".git", ".venv", "venv", "env", "node_modules", "__pycache__", ".pmap", "dist", "build", ".tox", ".mypy_cache"}
 MAX_PY_FILES = 6000
-CONTEXT_CHARS = 7500
+# The overview is paid for on every model call of the session, and agents find files fast on their own
+# (bench/reports): keep it to the layout, the links between languages and the gaps.
+CONTEXT_CHARS = 4000
 
 
 def _has_python_package(folder: Path) -> bool:
@@ -85,14 +91,19 @@ def session_start_context(cwd: Path) -> Optional[str]:
     header = (
         f"Method Project Map (pmap) — static map of this repository ({root.name}), for orientation before reading "
         f"files. Details on demand: `{cmd} find <name>`, `{cmd} show <node-id|path>`, `{cmd} source <node-id>` "
-        "(or the pmap_* MCP tools). `resolved` links are proven; verify `inferred` ones. Skill: project-map.\n\n"
+        "(or the pmap_* MCP tools). `resolved` links are proven; verify `inferred` ones. After you edit code, "
+        "the map adds a short note naming what depends on it in other files and languages. Skill: project-map.\n\n"
     )
     if files > MAX_PY_FILES:
         return header + f"(Large repository: more than {MAX_PY_FILES} source files; run `{cmd} context .` when needed.)"
-    from pmap.loader import find_design, load_map
+    from pmap.hints import SYNC_SCAN_FILES, current_map
+    from pmap.loader import find_design
     from pmap.mermaid import format_agent_context
 
-    actual = load_map(root, warn=False)
+    actual = current_map(root, scan=files <= SYNC_SCAN_FILES)
+    if actual is None:  # a big project without a map yet: do not hold up the session
+        return header + (f"(The map of this repository is being built in the background: the overview comes with the "
+                         f"next session, the notes after edits as soon as it is ready. `{cmd} context .` builds it now.)")
     design = None
     try:
         design = find_design(root)
@@ -101,20 +112,36 @@ def session_start_context(cwd: Path) -> Optional[str]:
     return header + format_agent_context(actual, design=design, max_chars=CONTEXT_CHARS)
 
 
-def run(event: str, stdin_text: str) -> int:
-    if event != "session-start":
+def run(event: str, stdin_text: str, target: Optional[str] = None) -> int:
+    if event == "refresh":
+        try:
+            from pmap.hints import refresh_cache
+
+            if target:
+                refresh_cache(Path(target))
+        except Exception:
+            pass
+        return 0
+    if event not in ("session-start", "post-edit"):
         return 0
     try:
         payload = json.loads(stdin_text) if stdin_text.strip() else {}
     except json.JSONDecodeError:
         payload = {}
+    if not isinstance(payload, dict):
+        return 0
     try:
-        cwd = Path(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
-        context = session_start_context(cwd)
+        if event == "post-edit":
+            from pmap.hints import post_edit_context
+
+            context, name = post_edit_context(payload), "PostToolUse"
+        else:
+            cwd = Path(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+            context, name = session_start_context(cwd), "SessionStart"
     except Exception:
         return 0
     if context:
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}},
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": name, "additionalContext": context}},
                          ensure_ascii=False))
     return 0
 

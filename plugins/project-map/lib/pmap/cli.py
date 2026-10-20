@@ -60,21 +60,33 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
+    from pmap.langs import bridges
+
     repo_root = Path(args.repo).resolve()
     design = _auto_find_design(repo_root, args.design)
-    if design is None:
+    actual = _load_or_scan_actual(repo_root)
+    if design is None and not bridges.bridge_edges(actual):
         print("Error: design map not found (design.yaml or PROJECT.mdm). Pass --design <path>.", file=sys.stderr)
         return 2
 
-    actual = _load_or_scan_actual(repo_root)
-    report = check_reflexion(design, actual, include_type_only=args.include_type_only)
-
+    # Links between languages are checked with or without a design: a channel method one platform does not
+    # handle fails at run time only.
+    report = check_reflexion(design, actual, include_type_only=args.include_type_only) if design is not None else None
+    gaps = bridges.gaps(actual)
     if args.json:
-        print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+        data = report.to_dict() if report is not None else {}
+        data["bridges"] = bridges.check_dict(actual)
+        print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
-        print(format_reflexion_text(report), end="")
+        if report is not None:
+            print(format_reflexion_text(report), end="")
+        else:
+            print("No design map (design.yaml or PROJECT.mdm): only the links between languages are checked.\n")
+        text = bridges.format_check(actual)
+        if text:
+            print(("\n" if report is not None else "") + text, end="")
 
-    if args.strict and not report.is_clean:
+    if args.strict and ((report is not None and not report.is_clean) or gaps):
         return 1
     return 0
 
@@ -244,6 +256,8 @@ def cmd_connection(args: argparse.Namespace) -> int:
 def cmd_hook(args: argparse.Namespace) -> int:
     from pmap.hook import run
 
+    if args.event == "refresh":
+        return run("refresh", "", args.target)
     return run(args.event, sys.stdin.read() if not sys.stdin.isatty() else "")
 
 
@@ -359,8 +373,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_conn = subparsers.add_parser("connection", help="Show which agents are connected")
     p_conn.set_defaults(func=cmd_connection)
 
-    p_hook = subparsers.add_parser("hook", help="Agent hook entry point (used by Claude Code)")
-    p_hook.add_argument("event", choices=["session-start"])
+    p_hook = subparsers.add_parser("hook", help="Agent hook entry point (used by Claude Code and Codex)")
+    p_hook.add_argument("event", choices=["session-start", "post-edit", "refresh"])
+    p_hook.add_argument("target", nargs="?", help="refresh: the project folder to rescan")
     p_hook.set_defaults(func=cmd_hook)
 
     return parser
