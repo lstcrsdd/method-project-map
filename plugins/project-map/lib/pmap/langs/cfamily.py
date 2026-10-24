@@ -267,7 +267,7 @@ def _declarator_name(ex: _C, node) -> Optional[str]:
 
 
 def _type_text(ex: _C, node) -> str:
-    """`const vpn::Profile&` -> `vpn.Profile`; `std::unique_ptr<Tunnel>` -> `Tunnel`; primitives -> ""."""
+    """`const audio::Profile&` -> `audio.Profile`; `std::unique_ptr<Decoder>` -> `Decoder`; primitives -> ""."""
     if node is None or node.type in ("primitive_type", "sized_type_specifier"):
         return ""
     if node.type == "template_type":

@@ -30,7 +30,7 @@ Use plain text search as well when a symptom names literal strings, config keys 
 
 ## Links between languages
 
-A Flutter app reaches Swift, Kotlin and C++ through a channel name and a method name (plain strings); Dart, Swift, C++ and Kotlin reach Rust or C through symbol names (FFI, JNI), Pigeon, flutter_rust_bridge, UniFFI or Tauri commands. No compiler checks these, so a rename on one side breaks the app at run time only. The map links both sides (`show` prints `via channel app.vpn/control "connect" -> macos/Runner/VpnChannel.swift:24`), the overview lists them, and a channel method that some platform does not handle is a **gap** (`[GAP]` in the overview, `{{PMAP}} check .`). When you change one side of a link, change or check the other side in the same task.
+A Flutter app reaches Swift, Kotlin and C++ through a channel name and a method name (plain strings); Dart, Swift, C++ and Kotlin reach Rust or C through symbol names (FFI, JNI), Pigeon, flutter_rust_bridge, UniFFI or Tauri commands. No compiler checks these, so a rename on one side breaks the app at run time only. The map links both sides (`show` prints `via channel audio/player "pause" -> ios/Classes/AudioPlayerPlugin.swift:88`), the overview lists them, and a channel method that some platform does not handle is a **gap** (`[GAP]` in the overview, `{{PMAP}} check .`). When you change one side of a link, change or check the other side in the same task.
 
 ## After changing code
 

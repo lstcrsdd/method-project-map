@@ -69,8 +69,8 @@ A file path or a qualified name also works.
 ## 5. After changes
 
 **The note after an edit.** After Claude Code's Edit / Write or Codex's apply_patch, `pmap hook post-edit` finds the declarations the edit touched (by line; a deleted or renamed declaration by the name its old text declared) and lists what depends on them outside the file:
-- `→ path:line  Name  (Language, channel app.vpn/control "connect")` — the other side of a link this code makes;
-- `← path:line  Name  (Language, C ABI vpn_core_start)` — code in another language that reaches this declaration; for a channel handler only the callers of the branches the edit touched;
+- `→ path:line  Name  (Language, channel audio/player "pause")` — the other side of a link this code makes;
+- `← path:line  Name  (Language, C ABI player_core_start)` — code in another language that reaches this declaration; for a channel handler only the callers of the branches the edit touched;
 - `! "status" is not handled in Kotlin (android)` — a gap this code is part of;
 - `used in N other files` — callers in other files: all of them when the edit touched the declaration's head or removed it, one summary line for an edit inside the body.
 

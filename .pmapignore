@@ -3,3 +3,4 @@ plugins/*/lib/
 bench/corpora/
 bench/hidden_tests/
 tests/fixtures/
+examples/audio_player/

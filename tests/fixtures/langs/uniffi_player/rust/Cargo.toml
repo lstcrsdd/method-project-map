@@ -1,0 +1,11 @@
+[package]
+name = "player-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "player_core"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+uniffi = "0.28"

@@ -118,18 +118,22 @@ cd method-project-map
 
 | Мост | Откуда | Куда |
 |---|---|---|
-| Каналы Flutter (методы, события, сообщения) | `invokeMethod('connect')` в Dart и обратно | ветка `case "connect":` / `"connect" ->` / `method_name() == "connect"` в Swift, Kotlin, Java, C++ |
+| Каналы Flutter (методы, события, сообщения) | `invokeMethod('pause')` в Dart и обратно | ветка `case "pause":` / `"pause" ->` / `method_name() == "pause"` в Swift, Kotlin, Java, C++ |
 | C ABI (FFI) | `lookup` / `@Native` из `dart:ffi`, Swift, C/C++, Go (cgo) | функции Rust с `#[no_mangle]`, определения на C, `@_cdecl`, `//export` |
 | JNI | `external fun` / `native` в Kotlin и Java | `Java_<пакет>_<класс>_<метод>` на Rust или C |
 | Сгенерированные привязки | Pigeon, flutter_rust_bridge, UniFFI, `invoke` в Tauri | реализация API Pigeon на Swift / Kotlin / Java, функция или команда на Rust |
-| Передачи через систему (возможные связи) | `startVPNTunnel`, `startService(Intent(…))` | провайдер NetworkExtension, сервис Android |
+| Передачи через систему (возможные связи) | NetworkExtension (Apple): приложение запускает своё расширение; `startService(Intent(…))` в Android | провайдер расширения; `onStartCommand` сервиса |
+
+На [examples/audio_player](examples/audio_player) — плагине Flutter, у которого на Windows нет ветки для `setSpeed`:
 
 ```text
-$ pmap show sym:lib/vpn/platform_vpn.dart:PlatformVpn.status
-  depends on (3):
-    resolved calls  VpnChannel.handle  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" -> macos/Runner/VpnChannel.swift:30
-    resolved calls  VpnChannel::HandleMethodCall  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" -> windows/runner/vpn_channel.cpp:22
-    GAP      calls  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" (not handled in Kotlin (android))
+$ cd examples/audio_player
+$ pmap check .
+No design map (design.yaml or PROJECT.mdm): only the links between languages are checked.
+
+Links between languages: 25 (channel 25)
+[!] GAPS (a platform that handles the channel does not handle this method):
+  ✗ channel audio/player: "setSpeed" is called from Dart (lib/player.dart:59) but C/C++ (windows) does not handle it (windows/audio_player_plugin.cpp:43)
 ```
 
 **Пропуск** — метод канала, который одна из платформ не обрабатывает. Вызов падает только на этой платформе. `pmap check .` перечисляет пропуски с `design.yaml` и без него, а `--strict` останавливает на них сборку в CI.
@@ -142,16 +146,16 @@ pmap connect --claude      # или --codex, --gemini, --all; отменить: 
 
 Для Claude Code и Codex команда ставит:
 
-- **заметку после каждой правки** (хук `PostToolUse`). В ней сказано, что зависит от только что изменённого кода в других файлах и на других языках. Если ничего не зависит, заметки нет, и в одной сессии она не повторяется:
+- **заметку после каждой правки** (хук `PostToolUse`). В ней сказано, что зависит от только что изменённого кода в других файлах и на других языках. Если ничего не зависит, заметки нет, и в одной сессии она не повторяется. После правки `AudioPlayer.pause` в плагине из примера:
 
   ```text
   Method Project Map — code elsewhere depends on what you just changed; keep it in step:
-  PlatformVpn.connect (lib/vpn/platform_vpn.dart:16)
-    → android/app/src/main/kotlin/com/example/vpn/MainActivity.kt:17  MainActivity.configureFlutterEngine  (Kotlin, channel app.vpn/control "connect")
-    → macos/Runner/VpnChannel.swift:24  VpnChannel.handle  (Swift, channel app.vpn/control "connect")
-    → windows/runner/vpn_channel.cpp:15  VpnChannel::HandleMethodCall  (C/C++, channel app.vpn/control "connect")
+  AudioPlayer.pause (lib/player.dart:41)
+    → android/src/main/kotlin/dev/example/audio_player/AudioPlayerPlugin.kt:112  AudioPlayerPlugin.onMethodCall  (Kotlin, channel audio/player "pause")
+    → ios/Classes/AudioPlayerPlugin.swift:88  AudioPlayerPlugin.handle  (Swift, channel audio/player "pause")
+    → windows/audio_player_plugin.cpp:57  AudioPlayerPlugin::HandleMethodCall  (C/C++, channel audio/player "pause")
     used in 1 other file:
-      lib/vpn/vpn_controller.dart:22  VpnController.connect
+      lib/ui/controls.dart:23  Controls.onPause
   ```
 
 - короткий **обзор в начале сессии** (хук `SessionStart`): языки, мосты между ними и пропуски, затем пакеты и файлы;
@@ -206,7 +210,8 @@ pmap/            сам инструмент: сканер, парсеры (pmap
 spec/            спецификация формата PMF 0.2 и JSON Schema
 docs/            руководства (RU/EN), протокол для агентов, скриншоты
 plugins/         сгенерированный плагин для Claude Code и Codex (scripts/build_plugin.py)
-examples/        небольшой проект с design.yaml и одним нарочно заложенным нарушением архитектуры
+examples/        toy_project — небольшой проект с design.yaml и одним нарочно заложенным нарушением архитектуры;
+                 audio_player — плагин Flutter с одним нарочно оставленным пропуском (на Windows нет setSpeed)
 bench/           испытание агентов: задачи, синтетические проекты, скрытые тесты, отчёты
 tests/           тесты и по маленькому проекту на каждый язык (python3 -m unittest discover -s tests)
 ```

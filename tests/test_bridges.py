@@ -1,8 +1,9 @@
 """Links between languages (pmap/langs/bridges.py) and the note an agent gets after an edit (pmap/hints.py).
 
-`flutter_vpn` is a VPN client: Flutter UI, Swift for macOS (with a NetworkExtension tunnel), Kotlin for Android,
-C++ for Windows and a Rust core reached through FFI, JNI and flutter_rust_bridge. Android deliberately does not
-handle the `status` method of the control channel. `tauri_vpn` and `uniffi_vpn` cover Tauri commands and UniFFI.
+`flutter_player` is an audio player: Flutter UI, Swift for macOS (with a NetworkExtension provider), Kotlin for
+Android, C++ for Windows and a Rust core reached through FFI, JNI and flutter_rust_bridge. Android deliberately does
+not handle the `status` method of the control channel. `tauri_player` and `uniffi_player` cover Tauri commands and
+UniFFI.
 """
 
 from __future__ import annotations
@@ -23,10 +24,10 @@ from pmap.models import ActualMap
 from pmap.scanner import ProjectScanner
 from tests.test_langs import FIXTURES, LangCase, needs
 
-DART = "sym:lib/vpn/platform_vpn.dart:PlatformVpn"
-SWIFT = "sym:macos/Runner/VpnChannel.swift:VpnChannel.handle"
-KOTLIN = "sym:android/app/src/main/kotlin/com/example/vpn/MainActivity.kt:MainActivity.configureFlutterEngine"
-CPP = "sym:windows/runner/vpn_channel.cpp:VpnChannel.HandleMethodCall"
+DART = "sym:lib/player/platform_player.dart:PlatformPlayer"
+SWIFT = "sym:macos/Runner/PlayerChannel.swift:PlayerChannel.handle"
+KOTLIN = "sym:android/app/src/main/kotlin/com/example/player/MainActivity.kt:MainActivity.configureFlutterEngine"
+CPP = "sym:windows/runner/player_channel.cpp:PlayerChannel.HandleMethodCall"
 FFI = "sym:rust/src/ffi.rs"
 
 
@@ -40,20 +41,20 @@ class BridgeCase(LangCase):
 
 
 @needs("dart", "swift", "kotlin", "cpp", "rust")
-class TestFlutterVpn(BridgeCase):
-    project = "flutter_vpn"
+class TestFlutterPlayer(BridgeCase):
+    project = "flutter_player"
 
     def test_channel_methods_reach_every_platform(self) -> None:
         for target, line in ((SWIFT, 24), (KOTLIN, 17), (CPP, 15)):
             e = self.link(f"{DART}.connect", target, "channel")
-            self.assertEqual((e.bridge["name"], e.bridge["method"]), ("app.vpn/control", "connect"))
+            self.assertEqual((e.bridge["name"], e.bridge["method"]), ("audio/player", "connect"))
             self.assertEqual(e.bridge["to"]["line"], line)  # the `case "connect"` branch, not the whole handler
-        self.assertEqual(e.location.path, "lib/vpn/platform_vpn.dart")
+        self.assertEqual(e.location.path, "lib/player/platform_player.dart")
 
     def test_channel_name_from_a_constant(self) -> None:
         # Dart: MethodChannel(kControlChannel); Swift: name: controlName; Kotlin: MethodChannel(messenger, channelName)
         names = {e.bridge["name"] for e in bridges.bridge_edges(self.map) if e.bridge["via"] == "channel"}
-        self.assertEqual(names, {"app.vpn/control"})
+        self.assertEqual(names, {"audio/player"})
 
     def test_method_a_platform_does_not_handle_is_a_gap(self) -> None:
         gaps = bridges.gaps(self.map)
@@ -65,45 +66,46 @@ class TestFlutterVpn(BridgeCase):
         self.link(f"{DART}.status", CPP, "channel")
 
     def test_native_calls_back_into_dart(self) -> None:
-        e = self.link("sym:macos/Runner/VpnChannel.swift:VpnChannel.revoked", f"{DART}._onNativeCall", "channel")
+        e = self.link("sym:macos/Runner/PlayerChannel.swift:PlayerChannel.revoked", f"{DART}._onNativeCall", "channel")
         self.assertEqual(e.bridge["method"], "onRevoked")
 
     def test_event_channel_reaches_the_stream_handler(self) -> None:
-        self.link(f"{DART}.states", "sym:macos/Runner/VpnChannel.swift:StateStreamHandler.onListen", "event-channel")
+        self.link(f"{DART}.states", "sym:macos/Runner/PlayerChannel.swift:StateStreamHandler.onListen", "event-channel")
         # Kotlin's handler is an anonymous object: the function that registers it stands for it
-        self.link(f"{DART}.states", "sym:android/app/src/main/kotlin/com/example/vpn/VpnStateStream.kt:"
-                                    "VpnStateStream.attach", "event-channel")
+        self.link(f"{DART}.states", "sym:android/app/src/main/kotlin/com/example/player/PlayerStateStream.kt:"
+                                    "PlayerStateStream.attach", "event-channel")
 
     def test_c_abi_from_dart_swift_and_cpp(self) -> None:
-        self.link("sym:lib/core/core_bindings.dart:CoreBindings.version", f"{FFI}:vpn_core_version", "ffi")
-        self.link("sym:lib/core/core_bindings.dart:CoreBindings.parseConfig", f"{FFI}:vpn_core_parse_config", "ffi")
-        self.link("sym:lib/core/core_bindings.dart:vpnCoreStats", f"{FFI}:vpn_core_stats", "ffi")  # @Native
-        self.link("sym:macos/Runner/TunnelController.swift:TunnelController.connect", f"{FFI}:vpn_core_start", "ffi")
-        self.link(CPP, f"{FFI}:vpn_core_start", "ffi")
+        self.link("sym:lib/core/core_bindings.dart:CoreBindings.version", f"{FFI}:player_core_version", "ffi")
+        self.link("sym:lib/core/core_bindings.dart:CoreBindings.parseConfig", f"{FFI}:player_core_parse_config", "ffi")
+        self.link("sym:lib/core/core_bindings.dart:playerCoreStats", f"{FFI}:player_core_stats", "ffi")  # @Native
+        self.link("sym:macos/Runner/ExtensionController.swift:ExtensionController.connect", f"{FFI}:player_core_start",
+                  "ffi")
+        self.link(CPP, f"{FFI}:player_core_start", "ffi")
 
     def test_header_declaration_gives_way_to_the_definition(self) -> None:
-        self.assertNoEdge(CPP, "sym:native/vpn_core.h:vpn_core_start")
-        self.assertFalse([e for e in self.map.errors if e.path == "native/vpn_core.h"])  # `extern "C"` guards parse
+        self.assertNoEdge(CPP, "sym:native/player_core.h:player_core_start")
+        self.assertFalse([e for e in self.map.errors if e.path == "native/player_core.h"])  # `extern "C"` guards parse
 
     def test_replaced_unknowns_are_gone(self) -> None:
         version = "sym:lib/core/core_bindings.dart:CoreBindings.version"
         self.assertNoEdge(version, "unresolved:fn")  # the looked-up function pointer
-        self.assertNoEdge("sym:macos/Runner/TunnelController.swift:TunnelController.connect",
+        self.assertNoEdge("sym:macos/Runner/ExtensionController.swift:ExtensionController.connect",
                           "unresolved:manager.connection.startVPNTunnel")
 
     def test_jni_and_flutter_rust_bridge(self) -> None:
-        kotlin = "sym:android/app/src/main/kotlin/com/example/vpn/NativeCore.kt:NativeCore"
-        self.link(f"{kotlin}.start", f"{FFI}:Java_com_example_vpn_NativeCore_start", "jni")
-        self.link(f"{kotlin}.stop", f"{FFI}:Java_com_example_vpn_NativeCore_stop", "jni")
+        kotlin = "sym:android/app/src/main/kotlin/com/example/player/NativeCore.kt:NativeCore"
+        self.link(f"{kotlin}.start", f"{FFI}:Java_com_example_player_NativeCore_start", "jni")
+        self.link(f"{kotlin}.stop", f"{FFI}:Java_com_example_player_NativeCore_stop", "jni")
         self.link("sym:lib/src/rust/api/config.dart:validateConfig", "sym:rust/src/api/config.rs:validate_config", "frb")
 
     def test_system_hand_offs_are_possible_links(self) -> None:
-        swift = "sym:macos/Runner/TunnelController.swift:TunnelController"
-        provider = "sym:macos/PacketTunnel/PacketTunnelProvider.swift:PacketTunnelProvider"
+        swift = "sym:macos/Runner/ExtensionController.swift:ExtensionController"
+        provider = "sym:macos/Extension/ExtensionProvider.swift:ExtensionProvider"
         self.link(f"{swift}.connect", f"{provider}.startTunnel", "network-extension", "inferred")
         self.link(f"{swift}.disconnect", f"{provider}.stopTunnel", "network-extension", "inferred")
-        kotlin = "sym:android/app/src/main/kotlin/com/example/vpn"
-        self.link(f"{kotlin}/MainActivity.kt:MainActivity.startTunnel", f"{kotlin}/TunnelService.kt:TunnelService."
+        kotlin = "sym:android/app/src/main/kotlin/com/example/player"
+        self.link(f"{kotlin}/MainActivity.kt:MainActivity.startPlayback", f"{kotlin}/PlaybackService.kt:PlaybackService."
                   "onStartCommand", "android-intent", "inferred")
 
     def test_links_survive_the_map_file(self) -> None:
@@ -114,17 +116,17 @@ class TestFlutterVpn(BridgeCase):
     def test_web_payload_carries_links_and_gaps(self) -> None:
         from pmap.web import build_payload
 
-        payload = build_payload(self.map, None, "flutter_vpn")
+        payload = build_payload(self.map, None, "flutter_player")
         rows = [e for e in payload["edges"] if e.get("br")]
-        self.assertTrue(any(e["br"] == {"v": "channel", "n": "app.vpn/control", "m": "connect",
-                                        "to": ["macos/Runner/VpnChannel.swift", 24]} for e in rows))
+        self.assertTrue(any(e["br"] == {"v": "channel", "n": "audio/player", "m": "connect",
+                                        "to": ["macos/Runner/PlayerChannel.swift", 24]} for e in rows))
         self.assertEqual(payload["bridges"]["gaps"][0]["missing"], "Kotlin (android)")
         self.assertIn("channel", [g["via"] for g in payload["bridges"]["groups"]])
 
     def test_overview_and_check_name_the_links_and_the_gap(self) -> None:
         text = format_agent_context(self.map, max_chars=3000)
         self.assertIn("Links between languages", text)
-        self.assertIn('[GAP] channel app.vpn/control: "status"', text)
+        self.assertIn('[GAP] channel audio/player: "status"', text)
         self.assertIn("JNI: Kotlin → Rust (NativeCore.start, NativeCore.stop)", text)
         check = bridges.format_check(self.map)
         self.assertIn("[!] GAPS", check)
@@ -139,8 +141,8 @@ class TestPlatformGuard(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp, True)
         root = tmp / "app"
-        shutil.copytree(FIXTURES / "flutter_vpn", root)
-        dart = root / "lib/vpn/platform_vpn.dart"
+        shutil.copytree(FIXTURES / "flutter_player", root)
+        dart = root / "lib/player/platform_player.dart"
         dart.write_text(dart.read_text(encoding="utf-8").replace(
             "Future<String> status() async => await _control.invokeMethod<String>('status') ?? 'unknown';",
             "Future<String> status() async {\n    if (!Platform.isMacOS && !Platform.isWindows) return 'unknown';\n"
@@ -178,35 +180,35 @@ class TestPluginStyleChannels(BridgeCase):
 class TestPigeon(BridgeCase):
     """Pigeon's generated `*.g.dart` stays on the map, and a call reaches the app's implementation of the API."""
 
-    project = "pigeon_vpn"
+    project = "pigeon_player"
 
     def test_generated_api_reaches_each_implementation(self) -> None:
-        dart = "sym:lib/src/messages.g.dart:VpnHostApi.connect"
-        e = self.link(dart, "sym:ios/Runner/VpnApi.swift:VpnApi.connect", "pigeon")
-        self.assertEqual((e.bridge["name"], e.bridge["method"]), ("VpnHostApi", "connect"))
-        self.link(dart, "sym:android/app/src/main/kotlin/dev/example/vpn/VpnApi.kt:VpnApi.connect", "pigeon")
+        dart = "sym:lib/src/messages.g.dart:PlayerHostApi.connect"
+        e = self.link(dart, "sym:ios/Runner/PlayerApi.swift:PlayerApi.connect", "pigeon")
+        self.assertEqual((e.bridge["name"], e.bridge["method"]), ("PlayerHostApi", "connect"))
+        self.link(dart, "sym:android/app/src/main/kotlin/dev/example/player/PlayerApi.kt:PlayerApi.connect", "pigeon")
 
     def test_app_code_calls_the_generated_api(self) -> None:
-        self.assertEdge("sym:lib/main.dart:connectTo", "sym:lib/src/messages.g.dart:VpnHostApi.connect", "resolved")
+        self.assertEdge("sym:lib/main.dart:connectTo", "sym:lib/src/messages.g.dart:PlayerHostApi.connect", "resolved")
 
 
 @needs("typescript", "rust")
 class TestTauri(BridgeCase):
-    project = "tauri_vpn"
+    project = "tauri_player"
 
     def test_invoke_reaches_the_command(self) -> None:
-        self.link("sym:src/vpn.ts:connect", "sym:src-tauri/src/main.rs:connect_vpn", "tauri")
-        self.link("sym:src/vpn.ts:status", "sym:src-tauri/src/main.rs:vpn_status", "tauri")
+        self.link("sym:src/player.ts:connect", "sym:src-tauri/src/main.rs:connect_stream", "tauri")
+        self.link("sym:src/player.ts:status", "sym:src-tauri/src/main.rs:player_status", "tauri")
 
 
 @needs("swift", "rust")
 class TestUniFFI(BridgeCase):
-    project = "uniffi_vpn"
+    project = "uniffi_player"
 
     def test_generated_swift_reaches_rust(self) -> None:
-        gen = "sym:ios/Generated/vpn_core.swift"
+        gen = "sym:ios/Generated/player_core.swift"
         self.link(f"{gen}:connect", "sym:rust/src/lib.rs:connect", "uniffi")
-        self.link(f"{gen}:VpnClient.status", "sym:rust/src/lib.rs:VpnClient.status", "uniffi")
+        self.link(f"{gen}:PlayerClient.status", "sym:rust/src/lib.rs:PlayerClient.status", "uniffi")
 
 
 class TestCommentsAndText(unittest.TestCase):
@@ -230,8 +232,8 @@ class TestPostEditNote(unittest.TestCase):
 
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp())
-        self.root = self.tmp / "flutter_vpn"
-        shutil.copytree(FIXTURES / "flutter_vpn", self.root)
+        self.root = self.tmp / "flutter_player"
+        shutil.copytree(FIXTURES / "flutter_player", self.root)
         env = mock.patch.dict(os.environ, {"PMAP_HOME": str(self.tmp / "home")})
         env.start()
         self.addCleanup(env.stop)
@@ -253,24 +255,24 @@ class TestPostEditNote(unittest.TestCase):
                                                      "new_string": new}}
 
     def test_dart_channel_call_names_every_platform_and_the_caller(self) -> None:
-        text = self.note(self.edit("lib/vpn/platform_vpn.dart",
+        text = self.note(self.edit("lib/player/platform_player.dart",
                                    "  Future<bool> connect(String server, String coreVersion) async {"))
-        self.assertIn("PlatformVpn.connect (lib/vpn/platform_vpn.dart:16)", text)
-        self.assertIn("macos/Runner/VpnChannel.swift:24  VpnChannel.handle", text)
-        self.assertIn("android/app/src/main/kotlin/com/example/vpn/MainActivity.kt:17", text)
-        self.assertIn("windows/runner/vpn_channel.cpp:15", text)
-        self.assertIn("lib/vpn/vpn_controller.dart:22  VpnController.connect", text)
+        self.assertIn("PlatformPlayer.connect (lib/player/platform_player.dart:16)", text)
+        self.assertIn("macos/Runner/PlayerChannel.swift:24  PlayerChannel.handle", text)
+        self.assertIn("android/app/src/main/kotlin/com/example/player/MainActivity.kt:17", text)
+        self.assertIn("windows/runner/player_channel.cpp:15", text)
+        self.assertIn("lib/player/player_controller.dart:22  PlayerController.connect", text)
         # once per session
-        self.assertEqual(self.note(self.edit("lib/vpn/platform_vpn.dart",
+        self.assertEqual(self.note(self.edit("lib/player/platform_player.dart",
                                              "  Future<bool> connect(String server, String coreVersion) async {")), "")
 
     def test_branch_of_a_handler_names_its_callers_only(self) -> None:
-        text = self.note(self.edit("macos/Runner/VpnChannel.swift", "      result(tunnel.status())"))
-        self.assertIn("lib/vpn/platform_vpn.dart:23  PlatformVpn.status", text)
-        self.assertNotIn("PlatformVpn.connect", text)
+        text = self.note(self.edit("macos/Runner/PlayerChannel.swift", "      result(playback.status())"))
+        self.assertIn("lib/player/platform_player.dart:23  PlatformPlayer.status", text)
+        self.assertNotIn("PlatformPlayer.connect", text)
 
     def test_status_gap_is_reported(self) -> None:
-        text = self.note(self.edit("lib/vpn/platform_vpn.dart",
+        text = self.note(self.edit("lib/player/platform_player.dart",
                                    "  Future<String> status() async => await _control.invokeMethod<String>('status') ?? "
                                    "'unknown';"))
         self.assertIn('"status" is not handled in Kotlin (android)', text)
@@ -280,26 +282,27 @@ class TestPostEditNote(unittest.TestCase):
                  "     let text = unsafe { CStr::from_ptr(profile) }.to_string_lossy();\n"
                  "-    match config::parse(&text) {\n+    match config::parse(&text) {\n*** End Patch")
         text = self.note({"tool_name": "apply_patch", "tool_input": {"command": patch}, "session_id": "codex"})
-        self.assertIn("vpn_core_start (rust/src/ffi.rs:15)", text)
-        self.assertIn("macos/Runner/TunnelController.swift:8  TunnelController.connect  (Swift, C ABI", text)
-        self.assertIn("windows/runner/vpn_channel.cpp:18", text)
+        self.assertIn("player_core_start (rust/src/ffi.rs:15)", text)
+        self.assertIn("macos/Runner/ExtensionController.swift:8  ExtensionController.connect  (Swift, C ABI", text)
+        self.assertIn("windows/runner/player_channel.cpp:18", text)
 
     def test_c_header_and_definition_point_at_each_other(self) -> None:
-        text = self.note(self.edit("rust/src/ffi.rs", "pub extern \"C\" fn vpn_core_start(profile: *const c_char) -> i32 {"))
-        self.assertIn("native/vpn_core.h:10  declares vpn_core_start", text)
-        text = self.note(self.edit("native/vpn_core.h", "int32_t vpn_core_start(const char *config);"))
-        self.assertIn("rust/src/ffi.rs:15  vpn_core_start  (Rust, the definition of this declaration)", text)
-        self.assertIn("macos/Runner/TunnelController.swift:8  TunnelController.connect", text)
+        text = self.note(self.edit("rust/src/ffi.rs",
+                                   "pub extern \"C\" fn player_core_start(profile: *const c_char) -> i32 {"))
+        self.assertIn("native/player_core.h:10  declares player_core_start", text)
+        text = self.note(self.edit("native/player_core.h", "int32_t player_core_start(const char *config);"))
+        self.assertIn("rust/src/ffi.rs:15  player_core_start  (Rust, the definition of this declaration)", text)
+        self.assertIn("macos/Runner/ExtensionController.swift:8  ExtensionController.connect", text)
 
     def test_deleted_declaration_names_what_used_it(self) -> None:
-        text = self.note(self.edit("android/app/src/main/kotlin/com/example/vpn/NativeCore.kt", "",
+        text = self.note(self.edit("android/app/src/main/kotlin/com/example/player/NativeCore.kt", "",
                                    old="    external fun stop()\n"))
-        self.assertIn("rust/src/ffi.rs:58  Java_com_example_vpn_NativeCore_stop", text)
-        self.assertIn("TunnelService.kt:19  TunnelService.onDestroy", text)
+        self.assertIn("rust/src/ffi.rs:58  Java_com_example_player_NativeCore_stop", text)
+        self.assertIn("PlaybackService.kt:19  PlaybackService.onDestroy", text)
 
     def test_body_edit_gets_one_line(self) -> None:
-        text = self.note(self.edit("rust/src/tunnel.rs", "    SENT.store(0, Ordering::SeqCst);"))
-        self.assertIn("start (rust/src/tunnel.rs:9)\n  used in 2 places in 1 other file (rust/src/ffi.rs:18, "
+        text = self.note(self.edit("rust/src/engine.rs", "    SENT.store(0, Ordering::SeqCst);"))
+        self.assertIn("start (rust/src/engine.rs:9)\n  used in 2 places in 1 other file (rust/src/ffi.rs:18, "
                       "rust/src/ffi.rs:52)", text)
 
     def test_silent_without_users_elsewhere(self) -> None:

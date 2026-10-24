@@ -119,15 +119,15 @@ cd method-project-map
 
 Мобильное или настольное приложение часто написано на нескольких языках: интерфейс на Flutter (Dart), Swift для платформ Apple, Kotlin или Java для Android, C++ для Windows, ядро на Rust. Друг к другу они обращаются **по именам, которые не проверяет ни один компилятор**: имя канала и метода, символ C, имя функции JNI. Карта связывает обе стороны:
 
-- **Каналы Flutter**: `invokeMethod('connect')` в Dart ведёт в ветку, которая обрабатывает `"connect"`, в Swift (`case "connect":`), Kotlin (`"connect" ->`), Java и C++ (`method_name() == "connect"`). Учтены и обратные вызовы из нативного кода в Dart, каналы событий (`receiveBroadcastStream` → `onListen`) и каналы сообщений.
+- **Каналы Flutter**: `invokeMethod('pause')` в Dart ведёт в ветку, которая обрабатывает `"pause"`, в Swift (`case "pause":`), Kotlin (`"pause" ->`), Java и C++ (`method_name() == "pause"`). Учтены и обратные вызовы из нативного кода в Dart, каналы событий (`receiveBroadcastStream` → `onListen`) и каналы сообщений.
 - **C ABI (FFI)**: `lookup` и `@Native` из `dart:ffi`, а также вызовы из Swift, C/C++ и Go ведут к функции Rust с `#[no_mangle]` или к определению на C с тем же символом.
 - **JNI**: `external fun` в Kotlin и `native` в Java ведут к своим функциям `Java_…`.
 - **Сгенерированные привязки**: Pigeon (вызов через сгенерированный API в Dart ведёт в реализацию этого API на Swift, Kotlin или Java), flutter_rust_bridge, UniFFI, команды Tauri.
-- **Передачи через систему** (возможные связи, выбирает система): `startVPNTunnel` из NetworkExtension → `startTunnel` провайдера туннеля, `startService(Intent(…))` в Android → `onStartCommand` сервиса.
+- **Передачи через систему** (возможные связи, выбирает система): NetworkExtension (Apple) — от приложения, которое запускает своё расширение, к провайдеру расширения; `startService(Intent(…))` в Android → `onStartCommand` сервиса.
 
-На карте это обычные связи с пометкой «мост» и с указанием, куда они ведут на другой стороне. Пакеты на разных языках соединены на обзоре; в боковой панели написано *через канал app.vpn/control «connect» → macos/Runner/VpnChannel.swift:24*; панель обзора перечисляет все каналы и виды мостов.
+На карте это обычные связи с пометкой «мост» и с указанием, куда они ведут на другой стороне. Пакеты на разных языках соединены на обзоре; в боковой панели написано *через канал audio/player «pause» → ios/Classes/AudioPlayerPlugin.swift:88*; панель обзора перечисляет все каналы и виды мостов.
 
-**Пропуск** — метод канала, который вызывают с одной стороны, а платформа, обрабатывающая этот канал, не обрабатывает. Например, Dart спрашивает `status`, а в обработчике на Kotlin такой ветки нет. На этой платформе вызов падает во время работы. Вызов внутри проверки платформы (`if (Platform.isIOS)`, `TargetPlatform.android`) учитывается только для названных в ней платформ. Пропуски показаны первыми в панели обзора, их перечисляет `pmap check .`.
+**Пропуск** — метод канала, который вызывают с одной стороны, а платформа, обрабатывающая этот канал, не обрабатывает. Например, Dart вызывает `setSpeed`, а в обработчике на C++ для Windows такой ветки нет ([examples/audio_player](../examples/audio_player)). На этой платформе вызов падает во время работы. Вызов внутри проверки платформы (`if (Platform.isIOS)`, `TargetPlatform.android`) учитывается только для названных в ней платформ. Пропуски показаны первыми в панели обзора, их перечисляет `pmap check .`.
 
 ### Боковая панель
 
@@ -311,9 +311,10 @@ codex plugin add project-map
 
 ```text
 Method Project Map — code elsewhere depends on what you just changed; keep it in step:
-vpn_core_start (rust/src/ffi.rs:15)
-  ← windows/runner/vpn_channel.cpp:18  VpnChannel::HandleMethodCall  (C/C++, C ABI vpn_core_start)
-  ← macos/Runner/TunnelController.swift:8  TunnelController.connect  (Swift, C ABI vpn_core_start)
+player_core_start (rust/src/ffi.rs:15)
+  ← windows/runner/player_channel.cpp:18  PlayerChannel::HandleMethodCall  (C/C++, C ABI player_core_start)
+  ← macos/Runner/ExtensionController.swift:8  ExtensionController.connect  (Swift, C ABI player_core_start)
+  = native/player_core.h:10  declares player_core_start for C, C++ and Swift — keep it in step
 ```
 
 Заметка берётся из сохранённой карты (`~/.pmap/cache`), которая обновляется в фоне после каждой правки, поэтому занимает заметно меньше секунды.

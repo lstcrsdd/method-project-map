@@ -221,7 +221,7 @@ class Resolver:
 
         if family == "c":
             outer = (decl.namespace or "").split("::") if decl.namespace else []
-            for i in range(len(outer), -1, -1):  # `vpn::Manager` from inside `namespace vpn`, or from outside
+            for i in range(len(outer), -1, -1):  # `audio::Manager` from inside `namespace audio`, or from outside
                 found = classes("c:" + "::".join(outer[:i] + parts[:-1]))
                 if found:
                     return found[0]

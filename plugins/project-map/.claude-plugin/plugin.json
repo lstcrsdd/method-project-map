@@ -1,6 +1,6 @@
 {
   "name": "project-map",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Static, LLM-free map of a codebase (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++): packages, files, classes, functions and the links between them, for agents (overview at session start, find/show/source tools) and people (interactive web view).",
   "author": {
     "name": "lstcrsdd",

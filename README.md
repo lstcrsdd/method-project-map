@@ -108,18 +108,22 @@ Some calls are checked by no compiler: a Flutter app reaches Swift, Kotlin and C
 
 | Link | From | To |
 |---|---|---|
-| Flutter platform channels (method, event, message) | `invokeMethod('connect')` in Dart, and back | the `case "connect":` / `"connect" ->` / `method_name() == "connect"` branch in Swift, Kotlin, Java, C++ |
+| Flutter platform channels (method, event, message) | `invokeMethod('pause')` in Dart, and back | the `case "pause":` / `"pause" ->` / `method_name() == "pause"` branch in Swift, Kotlin, Java, C++ |
 | C ABI (FFI) | `dart:ffi` `lookup` / `@Native`, Swift, C/C++, Go (cgo) | `#[no_mangle]` Rust functions, C definitions, `@_cdecl`, `//export` |
 | JNI | `external fun` / `native` in Kotlin and Java | `Java_<package>_<class>_<method>` in Rust or C |
 | Generated bindings | Pigeon, flutter_rust_bridge, UniFFI, Tauri `invoke` | the Swift / Kotlin / Java implementation of the Pigeon API, the Rust function or command |
-| System hand-offs (possible links) | `startVPNTunnel`, `startService(Intent(…))` | the NetworkExtension provider, the Android service |
+| System hand-offs (possible links) | NetworkExtension (Apple): the app starts its extension; Android `startService(Intent(…))` | the extension's provider; the service's `onStartCommand` |
+
+On [examples/audio_player](examples/audio_player), a Flutter plugin whose Windows side has no branch for `setSpeed`:
 
 ```text
-$ pmap show sym:lib/vpn/platform_vpn.dart:PlatformVpn.status
-  depends on (3):
-    resolved calls  VpnChannel.handle  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" -> macos/Runner/VpnChannel.swift:30
-    resolved calls  VpnChannel::HandleMethodCall  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" -> windows/runner/vpn_channel.cpp:22
-    GAP      calls  @ lib/vpn/platform_vpn.dart:23 via channel app.vpn/control "status" (not handled in Kotlin (android))
+$ cd examples/audio_player
+$ pmap check .
+No design map (design.yaml or PROJECT.mdm): only the links between languages are checked.
+
+Links between languages: 25 (channel 25)
+[!] GAPS (a platform that handles the channel does not handle this method):
+  ✗ channel audio/player: "setSpeed" is called from Dart (lib/player.dart:59) but C/C++ (windows) does not handle it (windows/audio_player_plugin.cpp:43)
 ```
 
 A **gap** is a channel method that one platform does not handle: the call crashes on that platform only. `pmap check .` lists gaps, with or without a `design.yaml`, and `--strict` fails a CI job on them.
@@ -132,16 +136,16 @@ pmap connect --claude      # or --codex, --gemini, --all; undo with pmap disconn
 
 This installs, for Claude Code and Codex:
 
-- a **note after each edit** (a `PostToolUse` hook): what depends on the code the agent just changed, in other files and other languages. It is silent when nothing does, and it never repeats itself within a session:
+- a **note after each edit** (a `PostToolUse` hook): what depends on the code the agent just changed, in other files and other languages. It is silent when nothing does, and it never repeats itself within a session. After a change to `AudioPlayer.pause` in the example plugin:
 
   ```text
   Method Project Map — code elsewhere depends on what you just changed; keep it in step:
-  PlatformVpn.connect (lib/vpn/platform_vpn.dart:16)
-    → android/app/src/main/kotlin/com/example/vpn/MainActivity.kt:17  MainActivity.configureFlutterEngine  (Kotlin, channel app.vpn/control "connect")
-    → macos/Runner/VpnChannel.swift:24  VpnChannel.handle  (Swift, channel app.vpn/control "connect")
-    → windows/runner/vpn_channel.cpp:15  VpnChannel::HandleMethodCall  (C/C++, channel app.vpn/control "connect")
+  AudioPlayer.pause (lib/player.dart:41)
+    → android/src/main/kotlin/dev/example/audio_player/AudioPlayerPlugin.kt:112  AudioPlayerPlugin.onMethodCall  (Kotlin, channel audio/player "pause")
+    → ios/Classes/AudioPlayerPlugin.swift:88  AudioPlayerPlugin.handle  (Swift, channel audio/player "pause")
+    → windows/audio_player_plugin.cpp:57  AudioPlayerPlugin::HandleMethodCall  (C/C++, channel audio/player "pause")
     used in 1 other file:
-      lib/vpn/vpn_controller.dart:22  VpnController.connect
+      lib/ui/controls.dart:23  Controls.onPause
   ```
 
 - a short **overview at session start** (a `SessionStart` hook): languages, links between languages and gaps, then packages and files;
@@ -196,7 +200,8 @@ pmap/            the tool: scanner, parsers (pmap/langs for languages besides Py
 spec/            PMF 0.2 format specification and JSON Schema
 docs/            user guides (EN/RU), agent protocol, screenshots
 plugins/         generated plugin for Claude Code and Codex (scripts/build_plugin.py)
-examples/        a small project with design.yaml and one deliberate architecture violation
+examples/        toy_project: a small project with design.yaml and one deliberate architecture violation;
+                 audio_player: a Flutter plugin with one deliberate gap (no setSpeed on Windows)
 bench/           agent benchmark: tasks, synthetic projects, hidden tests, reports
 tests/           unit tests and one small project per language (python3 -m unittest discover -s tests)
 ```

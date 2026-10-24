@@ -1,0 +1,5 @@
+name: player_app
+description: Audio player
+dependencies:
+  flutter:
+    sdk: flutter

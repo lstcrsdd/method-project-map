@@ -119,15 +119,15 @@ The analysis is static and closed-world: it does not see calls from code outside
 
 A mobile or desktop app often spans several languages: a Flutter UI in Dart, Swift for Apple platforms, Kotlin or Java for Android, C++ for Windows, a Rust core. They call each other through **names no compiler checks**: a platform-channel name and method name, a C symbol, a JNI function name. The map links both sides:
 
-- **Flutter platform channels**: a Dart `invokeMethod('connect')` goes to the branch that handles `"connect"` in Swift (`case "connect":`), Kotlin (`"connect" ->`), Java and C++ (`method_name() == "connect"`); native code calling back into Dart, event channels (`receiveBroadcastStream` to `onListen`) and message channels too.
+- **Flutter platform channels**: a Dart `invokeMethod('pause')` goes to the branch that handles `"pause"` in Swift (`case "pause":`), Kotlin (`"pause" ->`), Java and C++ (`method_name() == "pause"`); native code calling back into Dart, event channels (`receiveBroadcastStream` to `onListen`) and message channels too.
 - **C ABI (FFI)**: `dart:ffi` lookups and `@Native`, and calls from Swift, C/C++ and Go, go to the `#[no_mangle]` Rust function or the C definition with that symbol.
 - **JNI**: Kotlin `external fun` and Java `native` methods go to their `Java_…` functions.
 - **Generated bindings**: Pigeon (a call through the generated Dart API goes to the app's Swift, Kotlin or Java implementation), flutter_rust_bridge, UniFFI, Tauri commands.
-- **System hand-offs** (possible links, the system decides): NetworkExtension `startVPNTunnel` to the tunnel provider's `startTunnel`, Android `startService(Intent(…))` to the service's `onStartCommand`.
+- **System hand-offs** (possible links, the system decides): Apple NetworkExtension, from the app that starts its extension to the extension's provider; Android `startService(Intent(…))` to the service's `onStartCommand`.
 
-In the map these are ordinary links marked as bridges, with where they land on the other side: packages of different languages are joined on the overview, the side panel says *via channel app.vpn/control "connect" → macos/Runner/VpnChannel.swift:24*, and the overview panel lists every channel and kind of link.
+In the map these are ordinary links marked as bridges, with where they land on the other side: packages of different languages are joined on the overview, the side panel says *via channel audio/player "pause" → ios/Classes/AudioPlayerPlugin.swift:88*, and the overview panel lists every channel and kind of link.
 
-A **gap** is a channel method called from one side that a platform handling the channel does not handle — for example, Dart asks for `status` and the Kotlin handler has no branch for it. On that platform the call fails at run time. A call inside a platform check (`if (Platform.isIOS)`, `TargetPlatform.android`) counts only for the platforms it names. Gaps are shown first in the overview panel and listed by `pmap check .`.
+A **gap** is a channel method called from one side that a platform handling the channel does not handle — for example, Dart asks for `setSpeed` and the C++ handler for Windows has no branch for it ([examples/audio_player](../examples/audio_player)). On that platform the call fails at run time. A call inside a platform check (`if (Platform.isIOS)`, `TargetPlatform.android`) counts only for the platforms it names. Gaps are shown first in the overview panel and listed by `pmap check .`.
 
 ### Side panel
 
@@ -311,9 +311,10 @@ Use either the plugin or `pmap connect --claude`, not both: each adds the sessio
 
 ```text
 Method Project Map — code elsewhere depends on what you just changed; keep it in step:
-vpn_core_start (rust/src/ffi.rs:15)
-  ← windows/runner/vpn_channel.cpp:18  VpnChannel::HandleMethodCall  (C/C++, C ABI vpn_core_start)
-  ← macos/Runner/TunnelController.swift:8  TunnelController.connect  (Swift, C ABI vpn_core_start)
+player_core_start (rust/src/ffi.rs:15)
+  ← windows/runner/player_channel.cpp:18  PlayerChannel::HandleMethodCall  (C/C++, C ABI player_core_start)
+  ← macos/Runner/ExtensionController.swift:8  ExtensionController.connect  (Swift, C ABI player_core_start)
+  = native/player_core.h:10  declares player_core_start for C, C++ and Swift — keep it in step
 ```
 
 The note comes from a cached map (`~/.pmap/cache`), refreshed in the background after every edit, so it costs well under a second.

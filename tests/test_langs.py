@@ -160,96 +160,96 @@ class TestCSharp(LangCase):
 
 @needs("rust")
 class TestRust(LangCase):
-    project = "rust_vpn"
-    CONNECT = "sym:src/tunnel/mod.rs:Tunnel.connect"
+    project = "rust_player"
+    CONNECT = "sym:src/player/mod.rs:Player.connect"
 
     def test_modules_and_uses(self) -> None:
-        self.assertEdge("mod:src/lib.rs", "mod:src/tunnel/mod.rs", "resolved", "imports")  # `pub mod tunnel;`
-        self.assertEdge("mod:src/tunnel/mod.rs", "mod:src/tunnel/session.rs", "resolved", "imports")  # mod.rs layout
-        self.assertEdge("mod:src/main.rs", "mod:src/config.rs", "resolved", "imports")  # `use vpn_core::config::...`
+        self.assertEdge("mod:src/lib.rs", "mod:src/player/mod.rs", "resolved", "imports")  # `pub mod player;`
+        self.assertEdge("mod:src/player/mod.rs", "mod:src/player/session.rs", "resolved", "imports")  # mod.rs layout
+        self.assertEdge("mod:src/main.rs", "mod:src/config.rs", "resolved", "imports")  # `use player_core::config::...`
         self.assertEdge("sym:src/config.rs:ConfigStore.load", "sym:src/util.rs:default_server", "resolved")  # crate::
 
     def test_calls(self) -> None:
         self.assertEdge(self.CONNECT, "sym:src/config.rs:ConfigStore.load", "resolved")  # self.store: ConfigStore
-        self.assertEdge(self.CONNECT, "sym:src/tunnel/session.rs:Session.open", "resolved")  # via `pub use`
-        self.assertEdge(self.CONNECT, "sym:src/tunnel/session.rs:Session.handshake", "resolved")  # `-> Self`
-        self.assertEdge(self.CONNECT, "sym:src/tunnel/mod.rs:Tunnel.log", "resolved")
+        self.assertEdge(self.CONNECT, "sym:src/player/session.rs:Session.open", "resolved")  # via `pub use`
+        self.assertEdge(self.CONNECT, "sym:src/player/session.rs:Session.handshake", "resolved")  # `-> Self`
+        self.assertEdge(self.CONNECT, "sym:src/player/mod.rs:Player.log", "resolved")
         self.assertEdge(self.CONNECT, "ambiguous:self.transport.send", "inferred",  # Box<dyn Transport>
-                        candidates=["sym:src/tunnel/mod.rs:Transport.send", "sym:src/tunnel/udp.rs:UdpTransport.send"])
+                        candidates=["sym:src/player/mod.rs:Transport.send", "sym:src/player/udp.rs:UdpTransport.send"])
         self.assertEdge(self.CONNECT, "unresolved:mystery.call", "unresolved")
-        self.assertEdge("sym:src/main.rs:main", "sym:src/tunnel/mod.rs:Tunnel.connect", "resolved")  # let t = Tunnel::new()
-        self.assertEdge("sym:src/tunnel/udp.rs:UdpTransport@impl", "sym:src/tunnel/mod.rs:Transport", "resolved",
+        self.assertEdge("sym:src/main.rs:main", "sym:src/player/mod.rs:Player.connect", "resolved")  # Player::new()
+        self.assertEdge("sym:src/player/udp.rs:UdpTransport@impl", "sym:src/player/mod.rs:Transport", "resolved",
                         "inherits")  # impl Transport for UdpTransport
         self.assertFalse([e for e in self.map.edges if "to_string" in e.to_id])  # &str: a library type
 
 
 @needs("swift")
 class TestSwift(LangCase):
-    project = "swift_vpn"
-    START = "sym:Sources/VPNCore/TunnelManager.swift:TunnelManager.start"
+    project = "swift_player"
+    START = "sym:Sources/PlayerCore/PlaybackManager.swift:PlaybackManager.start"
 
     def test_module_and_calls(self) -> None:
-        self.assertEdge(self.START, "sym:Sources/VPNCore/ConfigStore.swift:ConfigStore.load", "resolved")  # same module
-        self.assertEdge(self.START, "sym:Sources/VPNCore/Session.swift:Session", "resolved")  # Session(profile:)
-        self.assertEdge(self.START, "sym:Sources/VPNCore/Session.swift:Session.connect", "resolved")
-        self.assertEdge(self.START, "sym:Sources/VPNCore/Logger.swift:TunnelManager.log", "resolved")  # an extension
-        self.assertEdge(self.START, "sym:Sources/VPNCore/TunnelManager.swift:BaseManager.describe", "resolved")
+        self.assertEdge(self.START, "sym:Sources/PlayerCore/ConfigStore.swift:ConfigStore.load", "resolved")  # same module
+        self.assertEdge(self.START, "sym:Sources/PlayerCore/Session.swift:Session", "resolved")  # Session(profile:)
+        self.assertEdge(self.START, "sym:Sources/PlayerCore/Session.swift:Session.connect", "resolved")
+        self.assertEdge(self.START, "sym:Sources/PlayerCore/Logger.swift:PlaybackManager.log", "resolved")  # an extension
+        self.assertEdge(self.START, "sym:Sources/PlayerCore/PlaybackManager.swift:BaseManager.describe", "resolved")
         self.assertEdge(self.START, "ambiguous:transport.send", "inferred",  # a protocol
-                        candidates=["sym:Sources/VPNCore/TunnelManager.swift:Transport.send",
-                                    "sym:Sources/VPNCore/UDPTransport.swift:UDPTransport.send"])
+                        candidates=["sym:Sources/PlayerCore/PlaybackManager.swift:Transport.send",
+                                    "sym:Sources/PlayerCore/UDPTransport.swift:UDPTransport.send"])
         self.assertEdge(self.START, "unresolved:mystery.call", "unresolved")
 
     def test_other_module_and_top_level_code(self) -> None:
         main = "mod:Sources/App/main.swift"
-        self.assertEdge(main, "sym:Sources/VPNCore/TunnelManager.swift:TunnelManager.start", "resolved")
-        self.assertEdge(main, "mod:Sources/VPNCore/TunnelManager.swift", "resolved", "imports")  # `import VPNCore`
-        self.assertEdge("mod:Sources/VPNCore/TunnelManager.swift", "ext:Foundation", "resolved", "imports")
+        self.assertEdge(main, "sym:Sources/PlayerCore/PlaybackManager.swift:PlaybackManager.start", "resolved")
+        self.assertEdge(main, "mod:Sources/PlayerCore/PlaybackManager.swift", "resolved", "imports")  # `import PlayerCore`
+        self.assertEdge("mod:Sources/PlayerCore/PlaybackManager.swift", "ext:Foundation", "resolved", "imports")
 
 
 @needs("dart")
 class TestDart(LangCase):
-    project = "dart_vpn"
-    CONNECT = "sym:lib/src/tunnel.dart:TunnelService.connect"
+    project = "dart_player"
+    CONNECT = "sym:lib/src/playback.dart:PlaybackService.connect"
 
     def test_library_imports(self) -> None:
-        self.assertEdge("mod:lib/vpn.dart", "mod:lib/src/tunnel.dart", "resolved", "imports")  # export
-        self.assertEdge("mod:lib/ui/home.dart", "mod:lib/vpn.dart", "resolved", "imports")  # package:vpn_app/...
+        self.assertEdge("mod:lib/player.dart", "mod:lib/src/playback.dart", "resolved", "imports")  # export
+        self.assertEdge("mod:lib/ui/home.dart", "mod:lib/player.dart", "resolved", "imports")  # package:player_app/...
         self.assertEdge("mod:lib/ui/home.dart", "ext:flutter", "resolved", "imports")
 
     def test_calls_and_widgets(self) -> None:
         self.assertEdge(self.CONNECT, "sym:lib/src/config.dart:ConfigStore.load", "resolved")
-        self.assertEdge(self.CONNECT, "sym:lib/src/tunnel.dart:Session.open", "resolved")
-        self.assertEdge(self.CONNECT, "sym:lib/src/tunnel.dart:TunnelService._log", "resolved")  # implicit this
+        self.assertEdge(self.CONNECT, "sym:lib/src/playback.dart:Session.open", "resolved")
+        self.assertEdge(self.CONNECT, "sym:lib/src/playback.dart:PlaybackService._log", "resolved")  # implicit this
         self.assertEdge(self.CONNECT, "ambiguous:transport.send", "inferred")  # an abstract class with implementors
         self.assertEdge(self.CONNECT, "unresolved:mystery.call", "unresolved")
-        self.assertEdge("sym:lib/ui/home.dart:HomePage.build", "sym:lib/src/tunnel.dart:TunnelService.connect",
+        self.assertEdge("sym:lib/ui/home.dart:HomePage.build", "sym:lib/src/playback.dart:PlaybackService.connect",
                         "resolved")  # through the barrel export
         self.assertEdge("sym:lib/ui/home.dart:HomePage.build", "sym:lib/ui/home.dart:StatusCard", "resolved")  # widget
-        self.assertEdge("sym:lib/main.dart:main", "sym:lib/src/tunnel.dart:TunnelService", "resolved")  # vpn.Tunnel...
+        self.assertEdge("sym:lib/main.dart:main", "sym:lib/src/playback.dart:PlaybackService", "resolved")  # import prefix
         self.assertNoEdge("sym:lib/main.dart:main", "unresolved:runApp")  # Flutter's own function
 
 
 @needs("cpp")
 class TestCpp(LangCase):
-    project = "cpp_vpn"
+    project = "cpp_player"
     START = "sym:src/manager.cpp:Manager.Start"
 
     def test_includes_and_out_of_line_methods(self) -> None:
-        self.assertEdge("mod:src/manager.cpp", "mod:include/tunnel/manager.h", "resolved", "imports")
+        self.assertEdge("mod:src/manager.cpp", "mod:include/engine/manager.h", "resolved", "imports")
         self.assertEdge("mod:src/main.cpp", "ext:windows.h", "resolved", "imports")
         node = next(n for n in self.map.nodes if n.id == self.START)
-        self.assertEqual((node.name, node.qualified_name), ("Manager::Start", "vpn::Manager::Start"))
+        self.assertEqual((node.name, node.qualified_name), ("Manager::Start", "audio::Manager::Start"))
 
     def test_calls(self) -> None:
         self.assertEdge(self.START, "sym:src/config.cpp:ConfigStore.Load", "resolved")  # the definition, not config.h
         self.assertEdge(self.START, "sym:src/session.cpp:Session.Open", "resolved")
         self.assertEdge(self.START, "sym:src/manager.cpp:Manager.Log", "resolved")  # implicit this
-        self.assertEdge(self.START, "sym:src/util.cpp:Format", "resolved")  # util::Format inside namespace vpn
+        self.assertEdge(self.START, "sym:src/util.cpp:Format", "resolved")  # util::Format inside namespace audio
         self.assertEdge(self.START, "ambiguous:transport_.Send", "inferred",  # a virtual method with an override
-                        candidates=["sym:include/tunnel/manager.h:Transport.Send",
+                        candidates=["sym:include/engine/manager.h:Transport.Send",
                                     "sym:src/udp_transport.cpp:UdpTransport.Send"])
         self.assertNoEdge(self.START, "unresolved:MessageBoxW")  # Win32 comes from <windows.h>
-        self.assertEdge("sym:src/main.cpp:main", "sym:include/tunnel/manager.h:Manager", "resolved")  # Manager m(...)
+        self.assertEdge("sym:src/main.cpp:main", "sym:include/engine/manager.h:Manager", "resolved")  # Manager m(...)
         self.assertEdge("sym:src/main.cpp:main", "sym:src/manager.cpp:Manager.Start", "resolved")
 
 

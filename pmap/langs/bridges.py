@@ -1,11 +1,11 @@
 """Links between languages that no compiler checks: Flutter platform channels, the C ABI, JNI, flutter_rust_bridge,
-UniFFI and Tauri commands, and the system hand-offs of VPN apps (NetworkExtension, Android services).
+UniFFI and Tauri commands, and hand-offs through the system (Apple NetworkExtension, Android services).
 
 A Flutter app reaches Swift, Kotlin and C++ through a channel name and a method name, both plain strings; Dart,
 Swift, C++ and Kotlin reach Rust or C through symbol names. Neither compiler sees the other side, so neither does
 an IDE, and a rename on one side breaks the app only at run time. This pass runs after the resolver and turns such
 links into `calls` edges with a `bridge` record, e.g.
-    {"via": "channel", "name": "app.vpn/control", "method": "connect", "to": {"path": "...", "line": 24}}
+    {"via": "channel", "name": "audio/player", "method": "pause", "to": {"path": "...", "line": 88}}
 - `resolved`: the names match exactly one target on that side;
 - `inferred`: several targets match, or the system picks the target (NetworkExtension, Android intents);
 - `unresolved` with `"missing": "<platform>"`: a channel method that a platform handling the channel does not handle.
@@ -1153,8 +1153,8 @@ class _Linker:
         if not providers:
             return
         for src in self.srcs.values():
-            if src.lang != "swift" or not any(w in src.raw for w in ("VPNTunnel", "startTunnel", "stopTunnel",
-                                                                     "sendProviderMessage")):
+            if src.lang != "swift" or not any(w in src.raw for w in ("startVPNTunnel", "stopVPNTunnel", "startTunnel",
+                                                                     "stopTunnel", "sendProviderMessage")):
                 continue
             for pattern, target in _NE_CALLS:
                 for m in pattern.finditer(src.text):
@@ -1264,7 +1264,7 @@ def gaps(actual: ActualMap) -> List[ActualEdge]:
 
 
 def describe(edge: ActualEdge) -> str:
-    """` via channel app.vpn/control "connect" -> macos/Runner/VpnChannel.swift:24` for an edge between languages
+    """` via channel audio/player "pause" -> ios/Classes/AudioPlayerPlugin.swift:88` for an edge between languages
     (empty for any other edge)."""
     b = edge.bridge or {}
     if not b:

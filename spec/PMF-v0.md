@@ -107,19 +107,19 @@
 Вызовы, которые не проверяет ни один компилятор, — ребро `calls` с `source: "pmap-bridge"` и объектом `bridge`:
 
 ```json
-{"from": "sym:lib/vpn/platform_vpn.dart:PlatformVpn.connect", "to": "sym:macos/Runner/VpnChannel.swift:VpnChannel.handle",
- "kind": "calls", "confidence": "resolved", "source": "pmap-bridge", "target_symbol": "channel app.vpn/control#connect",
- "location": {"path": "lib/vpn/platform_vpn.dart", "line": 17},
- "bridge": {"via": "channel", "name": "app.vpn/control", "method": "connect",
-            "to": {"path": "macos/Runner/VpnChannel.swift", "line": 24}}}
+{"from": "sym:lib/player.dart:AudioPlayer.pause", "to": "sym:ios/Classes/AudioPlayerPlugin.swift:AudioPlayerPlugin.handle",
+ "kind": "calls", "confidence": "resolved", "source": "pmap-bridge", "target_symbol": "channel audio/player#pause",
+ "location": {"path": "lib/player.dart", "line": 42},
+ "bridge": {"via": "channel", "name": "audio/player", "method": "pause",
+            "to": {"path": "ios/Classes/AudioPlayerPlugin.swift", "line": 88}}}
 ```
 
 - `via`: `channel`, `event-channel`, `message-channel` (каналы Flutter: имя канала и метода — строки), `pigeon` (`name` — API, `method` — его метод, цель — реализация API на платформе), `ffi` (символ C ABI: `dart:ffi`, Swift, C/C++ и Go вызывают функцию Rust или C), `jni` (`external fun` / `native` ↔ `Java_<пакет>_<класс>_<метод>`), `frb` (flutter_rust_bridge), `uniffi`, `tauri`, `network-extension` и `android-intent` (передачи через систему).
-- `name` — имя канала, символа, привязки или команды; `method` — метод канала; `to` — строка на другой стороне (ветка `case "connect":` обработчика, определение функции).
+- `name` — имя канала, символа, привязки или команды; `method` — метод канала; `to` — строка на другой стороне (ветка `case "pause":` обработчика, определение функции).
 - `resolved` — имена совпали ровно с одной целью; `inferred` — целей несколько или цель выбирает система (`candidates` перечисляет их).
 - Пропуск: метод канала, который вызывают с одной стороны, а платформа, обрабатывающая этот канал, не обрабатывает, — ребро `unresolved` к `unresolved:channel <канал>#<метод>@<платформа>` с `bridge.missing` (например, `"Kotlin (android)"`). На этой платформе вызов падает во время работы. Вызов из функции Dart с проверкой платформы (`Platform.isIOS`, `TargetPlatform.android`) проверяется только для названных платформ, а при отрицании (`!Platform.isIOS`) не проверяется.
 
-Вызов C/C++, привязанный к объявлению в заголовке, переводится на определение в другом языке (`vpn_core.h` → `rust/src/ffi.rs`). Поле `bridge` добавлено без смены версии формата.
+Вызов C/C++, привязанный к объявлению в заголовке, переводится на определение в другом языке (`player_core.h` → `rust/src/ffi.rs`). Поле `bridge` добавлено без смены версии формата.
 
 ## 3. Привязка к коду и контроль устаревания (Staleness)
 

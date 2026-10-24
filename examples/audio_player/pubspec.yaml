@@ -1,0 +1,23 @@
+name: audio_player
+description: Example for Method Project Map — a Flutter plugin that plays audio through each platform's own player.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: dev.example.audio_player
+        pluginClass: AudioPlayerPlugin
+      ios:
+        pluginClass: AudioPlayerPlugin
+      windows:
+        pluginClass: AudioPlayerPluginCApi
