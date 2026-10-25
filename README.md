@@ -126,7 +126,88 @@ Links between languages: 25 (channel 25)
   ✗ channel audio/player: "setSpeed" is called from Dart (lib/player.dart:59) but C/C++ (windows) does not handle it (windows/audio_player_plugin.cpp:43)
 ```
 
-A **gap** is a channel method that one platform does not handle: the call crashes on that platform only. `pmap check .` lists gaps, with or without a `design.yaml`, and `--strict` fails a CI job on them.
+A **gap** is a channel method that one platform does not handle: the call crashes on that platform only. `pmap check .` lists gaps, with or without a `design.yaml`, and `--strict` fails a CI job on them. When the platform handles a method that no Dart code sends, the gap names it: `(Android handles "relase" at …ControlHandler.kt:24, which no Dart code sends)`.
+
+Both ends of a link can also be found and still disagree. `pmap check .` lists these as **signatures and names that differ**, and `--strict` fails on them too:
+
+```text
+[!] SIGNATURES AND NAMES THAT DIFFER (both sides are known and do not agree):
+  ✗ C ABI player_core_open: Rust takes 2 parameters (rust/src/ffi.rs:7); native/player_core.h:10 declares 1; ios/Runner/CoreBridge.swift:6 passes 1
+  ✗ JNI NativeCore.load: Kotlin declares parameter 1 as uri: String (…/NativeCore.kt:16), Rust takes it as uri: jboolean (rust/src/jni.rs:28)
+  ✗ JNI NativeCore.setVolume: Kotlin declares 2 parameters (…/NativeCore.kt:14), Rust takes 1 after env and this (rust/src/jni.rs:23)
+  ✗ event channel player/levels (lib/player/player_channel.dart:11): no iOS code in this project registers this name; iOS code registers player/level, which no Dart code listens to (ios/Runner/StatsChannel.swift:8)
+```
+
+(from the test project `tests/fixtures/langs/contracts_player`). A count is compared only when both sides are certain: macros, variadics, overloaded natives, trailing closures and C functions declared with `()` are skipped, not reported, and a channel name is paired only with a near name in the same package. On real code (the Flutter SDK, 111 pub.dev packages with native code, Go's cgo tests and four apps with 18 to 333 links each) the checks reported nothing: the 1,699 C ABI uses and 42 JNI functions whose two sides were both known all agreed. The channel-name check met no candidate there, so it has been tried on test projects only.
+
+## The same logic in several languages
+
+An app shipped on several platforms often has one piece of logic written by hand in each language: parsing a link, building a config, formatting a value. Nothing checks that the copies stay the same. `pmap twins` finds such copies; `pmap twins --exec` runs them on the same inputs and compares what they print.
+
+**Finding them** is static and takes about a second on a 2,000-file repository. Functions in different languages that use the same rare string literals and constants (keys such as `"codec"` or `"peer_cidr"`) form a candidate group. Tests, generated and vendored files are skipped. A candidate may be a hand-written copy, the other end of one format (one side writes the keys, the other reads them; listed separately), or unrelated, so a group is a lead, not proof:
+
+```text
+$ pmap twins tests/fixtures/twins
+1 candidate group: functions in different languages that use the same rare string literals. Each may be a hand-written copy, the other end of one format, or unrelated (static, not proof; `--exec` compares outputs)
+
+buildConfig / build_config  (literal overlap 1.00, twin:327d6fc44e)
+  kotlin/StreamLink.kt:11  buildConfig  (Kotlin, no proven callers in the map; overlap 1.00 with buildConfig: 26 of 27 literals, same name: yes; ...)
+  python/stream_link.py:17  build_config  (Python, reached from app code; overlap 1.00 with buildConfig: 23 of 23 literals, same name: yes; ...)
+  rust/main.rs:44  build_config  (Rust, reached from app code; ...)
+  swift/main.swift:14  buildConfig  (Swift, reached from app code; ...)
+  shared literals: "peer", "cache", "codec", "enabled", "fallback", "host", "kind", "local" (+19 more)
+```
+
+**Running them** takes a config: how to build and run each copy (one input per line on stdin, one output per line on stdout) and, optionally, a judge, a program that checks one output (for example the tool that will read the config). The inputs come from the repository's own tests: every string literal, in any language, that matches `from_tests`.
+
+```json
+{
+  "groups": [{
+    "name": "stream link -> player config",
+    "inputs": {"from_tests": "(?:stream|podcast)://.*"},
+    "reference": "rust",
+    "judge": ["python3", "{config_dir}/check_config.py", "{file}"],
+    "copies": [
+      {"name": "rust", "language": "Rust", "files": ["rust/main.rs"],
+       "build": ["rustc", "-o", "{work}/twin", "{repo}/rust/main.rs"], "run": ["{work}/twin"]},
+      {"name": "swift", "language": "Swift", "files": ["swift/main.swift"],
+       "build": ["swiftc", "-o", "{work}/twin", "{repo}/swift/main.swift"], "run": ["{work}/twin"]},
+      {"name": "python", "language": "Python", "files": ["python/stream_link.py"],
+       "run": ["python3", "{repo}/python/stream_link.py"]}
+    ]
+  }]
+}
+```
+
+```text
+$ pmap twins tests/fixtures/twins --exec --config twins.json
+stream link -> player config
+  inputs: 5 from tests, 0 synthetic
+  agree on 2 of 5 inputs: 1 identical outputs the judge accepts, 0 identical outputs the judge refuses, 1 rejected by every copy
+  compared against rust (the base chosen in the config; pmap does not assume it is right)
+  ...
+2. the judge accepted the output of rust, python and refused the output of swift  [no explanation found]  1 input(s)
+     first input: stream://listener@[2001:db8::1]:8443?codec=opus#Name (tests/test_links.py:13)
+     swift (first input): refused: FATAL: cannot parse prefix '[2001:db8::1]/128'
+4. sources[0].host  (different values: rust+python vs swift)  [no explanation found]  1 input(s)
+     rust (first input): "2001:db8::1"
+     swift (first input): "[2001:db8::1]"
+     writer in swift: swift/main.swift:27 (the only line writing the key; line last changed: ...)
+       comment near it: swift/main.swift:23: // URLComponents keeps the brackets of an IPv6 host.
+6. sources[0].eq  (present in one, absent in another: rust+swift vs python)  [documented]  1 input(s)
+     documented at python/stream_link.py:4: Intended difference: this copy never writes `eq` ...
+```
+
+How to read the report:
+
+- A difference is a difference, not a bug. pmap does not know which copy is right; `reference` is only the base the others are compared against.
+- For each differing key it names the line in each copy that writes it and when that line last changed (`git blame`).
+- A difference is `[documented]` only when a comment in one of the copies or a `*.md` line says it is intended. Fingerprints listed in `twins-accepted.json` next to the config are known differences. `--strict` exits with 1 on any other difference, for CI.
+- Test strings that cannot be used as they are (interpolated, concatenated) are listed as not executed, never dropped silently; copies are built from the committed files (`git` at `rev`, default `HEAD`).
+
+On a team's client app written in Swift, C#, Java and Rust, the first run over 69 links from its tests and one written for the run found two differences the app's own config checker confirms: the Swift copy kept the brackets of an IPv6 host and passed ports above 65535 through, and the checker refused both outputs, while the Rust copy rejected or fixed those inputs.
+
+After an edit, the note names the other copies of the function you changed ("same logic in other languages … check whether the same change is needed there").
 
 ## For AI agents
 

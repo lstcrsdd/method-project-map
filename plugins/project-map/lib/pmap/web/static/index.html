@@ -311,6 +311,7 @@ const L = {
     brConfirmedTitle: "The names on both sides match exactly (resolved)", brPossibleTitle: "The system picks the target, or several targets match (inferred)",
     bridgeLegend: "between languages", bridgeTagTitle: (langs) => `Linked with code in ${langs}; no compiler checks these calls`,
     bridgesH: "Links between languages", bridgesHint: "Calls no compiler checks: change both sides together.",
+    differs: "Sides differ:",
     gapLine: (name, m, from, at, missing, to) => `<b>Gap:</b> channel ${name}, "${m}" is called from ${from}${at ? ` (${at})` : ""} but ${missing} does not handle it${to ? ` (${to})` : ""}`,
     gapHere: (name, m, missing, to) => `<b>Gap:</b> ${missing} does not handle "${m}" of channel ${name}${to ? ` (its handler: ${to})` : ""}; the call fails there at run time.`,
   },
@@ -385,6 +386,7 @@ const L = {
     brConfirmedTitle: "Имена на обеих сторонах совпадают точно (resolved)", brPossibleTitle: "Цель выбирает система, или подходят несколько целей (inferred)",
     bridgeLegend: "между языками", bridgeTagTitle: (langs) => `Связан с кодом на ${langs}; эти вызовы не проверяет ни один компилятор`,
     bridgesH: "Мосты между языками", bridgesHint: "Эти вызовы не проверяет ни один компилятор: меняйте обе стороны вместе.",
+    differs: "Стороны не совпадают:",
     gapLine: (name, m, from, at, missing, to) => `<b>Пропуск:</b> канал ${name}, метод «${m}» вызывается из ${from}${at ? ` (${at})` : ""}, но ${missing} его не обрабатывает${to ? ` (${to})` : ""}`,
     gapHere: (name, m, missing, to) => `<b>Пропуск:</b> ${missing} не обрабатывает метод «${m}» канала ${name}${to ? ` (его обработчик: ${to})` : ""}; там вызов упадёт во время работы.`,
   },
@@ -570,7 +572,7 @@ function pkgLabel(p) {
 function modLabel(id) { const n = IX.byId.get(id); return n && n.f ? n.f.split("/").pop() : (n ? n.q : id); }
 function isEmptyInit(id) { const n = IX.byId.get(id); return n.f.endsWith("__init__.py") && !(IX.kids.get(id) || []).length && !IX.modDeps.has(id); }
 const size = (m) => (m ? m.size : 0);
-function hasBridges() { const b = DATA && DATA.bridges; return !!(b && ((b.groups || []).length || (b.gaps || []).length)); }
+function hasBridges() { const b = DATA && DATA.bridges; return !!(b && ((b.groups || []).length || (b.gaps || []).length || (b.mismatches || []).length)); }
 // "⇄ C/C++, Kotlin, Swift": the other languages a package or file is linked with
 function brTag(langs) {
   if (!langs || !langs.size) return "";
@@ -1049,8 +1051,8 @@ function overview() {
 
 // links between languages in the project panel: gaps first, then one row per channel or kind of link
 function bridgesSection() {
-  const B = DATA.bridges || {}, gaps = B.gaps || [], groups = B.groups || [];
-  if (!gaps.length && !groups.length) return "";
+  const B = DATA.bridges || {}, gaps = B.gaps || [], groups = B.groups || [], diffs = B.mismatches || [];
+  if (!gaps.length && !groups.length && !diffs.length) return "";
   const name = (n) => esc(n === "?" ? t("nameNotFound") : n);
   const items = (list) => {
     const shown = [];
@@ -1060,6 +1062,8 @@ function bridgesSection() {
   return `<div id="bridges"><h3>${t("bridgesH")}</h3><div class="list">` +
     gaps.slice(0, 30).map((g) => `<div class="warn">${t("gapLine", name(g.name), esc(g.method), esc(g.from), fileRefAt(g.at), esc(g.missing), fileRefAt(g.to))}</div>`).join("") +
     (gaps.length > 30 ? `<div class="warn">${t("more", gaps.length - 30)}</div>` : "") +
+    diffs.slice(0, 30).map((m) => `<div class="warn"><b>${t("differs")}</b> ${esc(m.text)}</div>`).join("") +
+    (diffs.length > 30 ? `<div class="warn">${t("more", diffs.length - 30)}</div>` : "") +
     groups.slice(0, 20).map((g) => `<div><span class="pill br">${esc(t("vias")[g.via] || g.via)}</span>${g.name ? `<b>${name(g.name)}</b>` : ""}` +
       `<span class="blk">${esc(g.dirs.map(([a, bs]) => `${a} → ${bs.join(", ")}`).join("; "))}</span><span class="blk ln">${esc(items(g.items.filter(Boolean)))}</span></div>`).join("") +
     (groups.length > 20 ? `<div class="muted">${t("more", groups.length - 20)}</div>` : "") +

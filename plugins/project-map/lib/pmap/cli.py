@@ -72,7 +72,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     # Links between languages are checked with or without a design: a channel method one platform does not
     # handle fails at run time only.
     report = check_reflexion(design, actual, include_type_only=args.include_type_only) if design is not None else None
-    gaps = bridges.gaps(actual)
+    gaps = bridges.problems(actual)  # gaps, and signatures or channel names whose two known sides differ
     if args.json:
         data = report.to_dict() if report is not None else {}
         data["bridges"] = bridges.check_dict(actual)
@@ -158,6 +158,29 @@ def cmd_source(args: argparse.Namespace) -> int:
         print(f"Unknown node {args.ref!r}. Use `pmap find <name>` to look up node ids.", file=sys.stderr)
         return 2
     print(source_of(node, repo_root, context_lines=args.context), end="")
+    return 0
+
+
+def cmd_twins(args: argparse.Namespace) -> int:
+    if args.exec:  # run the copies and compare what they print (pmap/twins_exec.py)
+        from pmap.twins_exec import run_cli
+
+        return run_cli(args)
+    if args.strict or args.config:  # a CI gate that can never fail is worse than none
+        print("pmap twins: --strict and --config need --exec", file=sys.stderr)
+        return 2
+    from pmap.twins import DEFAULT_MIN_SCORE, find_twins, format_twins
+
+    repo_root = Path(args.repo).resolve()
+    actual = _load_or_scan_actual(repo_root)
+    stats: dict = {}
+    groups = find_twins(actual, repo_root, min_score=DEFAULT_MIN_SCORE if args.min_score is None else args.min_score,
+                        stats=stats)
+    if args.json:
+        print(json.dumps({"groups": [g.to_dict() for g in groups], "stats": stats,
+                          "languages": actual.languages}, indent=2, ensure_ascii=False))
+    else:
+        print(format_twins(groups, markdown=args.md, languages=actual.languages, stats=stats), end="")
     return 0
 
 
@@ -329,6 +352,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_source.add_argument("--repo", default=".", help="Repository root (default: current directory)")
     p_source.add_argument("--context", type=int, default=0, help="Extra lines before and after")
     p_source.set_defaults(func=cmd_source)
+
+    p_twins = subparsers.add_parser("twins", help="Find candidate copies of one piece of logic across languages "
+                                                  "(static); --exec runs the copies and compares their outputs")
+    p_twins.add_argument("repo", nargs="?", default=".", help="Repository root (default: current directory)")
+    p_twins.add_argument("--json", action="store_true", help="Output as JSON")
+    p_twins.add_argument("--md", action="store_true", help="Output as Markdown")
+    p_twins.add_argument("--min-score", type=float, default=None, help="Lowest literal overlap kept (default 0.55)")
+    p_twins.add_argument("--exec", action="store_true", help="Run the copies named in twins.json / twins.yaml")
+    p_twins.add_argument("--config", help="--exec: the twins.json / twins.yaml to use (may live outside the repo)")
+    p_twins.add_argument("--strict", action="store_true",
+                         help="--exec: exit 1 when a difference has no explanation and is not accepted, or when "
+                              "less was compared than configured")
+    p_twins.set_defaults(func=cmd_twins)
 
     p_mcp = subparsers.add_parser("mcp", help="Run the MCP server (stdio) for Claude Code, Codex and other agents")
     p_mcp.add_argument("--repo", default=None, help="Default repository (default: $PMAP_REPO or the working directory)")

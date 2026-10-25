@@ -34,7 +34,7 @@ A Flutter app reaches Swift, Kotlin and C++ through a channel name and a method 
 
 ## After changing code
 
-After each edit, a short note may appear ("Method Project Map — code elsewhere depends on what you just changed"): callers in other files and the other side of every link between languages for the declarations you touched. Read it and update or check what it names before you finish; it is silent when nothing outside the file depends on the change.
+After each edit, a short note may appear ("Method Project Map — code elsewhere depends on what you just changed"): callers in other files and the other side of every link between languages for the declarations you touched. Read it and update or check what it names before you finish; it is silent when nothing outside the file depends on the change. When it lists the same logic in other languages (a function written by hand again in Swift, Kotlin, Rust…), decide whether the same change is needed there; `{{PMAP}} twins .` lists such copies, and `{{PMAP}} twins . --exec --config twins.json` runs them on the same inputs when the project has a config.
 
 If the repository has a `design.yaml`, run `{{PMAP}} check .` and fix any new *divergence* (a dependency the design does not allow) unless the task is to change the architecture.
 

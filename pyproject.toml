@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "method-project-map"
-version = "0.5.1"
+version = "0.6.0"
 description = "Method Project Map — a static, LLM-free map of codebases (Python, TypeScript/JavaScript, Go, Java, Kotlin, C#, Swift, Dart, Rust, C/C++) for people and AI coding agents"
 readme = "README.md"
 license = { text = "MIT" }

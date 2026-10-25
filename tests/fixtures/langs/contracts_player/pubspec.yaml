@@ -1,0 +1,12 @@
+name: contracts_player
+description: Test project for checks on links between languages (parameter counts, JNI types, channel names).
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0

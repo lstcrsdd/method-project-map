@@ -145,7 +145,8 @@ def describe_node(actual: ActualMap, node: ActualNode, max_items: int = 40) -> s
             lines.append(f"    ... +{len(known) - max_items} more")
         for e in unknown:
             if e.bridge and e.bridge.get("missing"):
-                lines.append(f"    GAP      {e.kind:<8} @ {_edge_line(e)}{describe_bridge(e)}")
+                label = "MISMATCH" if e.bridge.get("mismatch") else "GAP"
+                lines.append(f"    {label:<8} {e.kind:<8} @ {_edge_line(e)}{describe_bridge(e)}")
         unknown = [e for e in unknown if not (e.bridge and e.bridge.get("missing"))]
         if unknown:
             exprs = sorted({e.target_symbol or e.to_id for e in unknown})

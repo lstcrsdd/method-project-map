@@ -373,6 +373,7 @@ All commands: `pmap <command> --help`.
 | `pmap show REF` | one node with links and users | `--repo` |
 | `pmap source REF` | source of one node | `--repo`, `--context N` |
 | `pmap check FOLDER` | compare with `design.yaml`; list gaps between languages | `--design`, `--json`, `--strict`, `--include-type-only` |
+| `pmap twins FOLDER` | find the same logic written by hand in several languages; `--exec` runs the copies on the same inputs and compares the output | `--exec`, `--config FILE`, `--strict`, `--json`, `--md`, `--min-score` |
 | `pmap stale FOLDER` | changed since the last scan | `--json` |
 | `pmap mermaid FOLDER` | Mermaid diagram | `--level subsystem\|module`, `--design` |
 | `pmap mcp` | MCP server over stdio | `--repo` |

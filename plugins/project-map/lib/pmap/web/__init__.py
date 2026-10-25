@@ -47,6 +47,8 @@ def build_payload(actual: ActualMap, design: Optional[DesignMap], repo_name: str
     for e in actual.edges:
         if e.kind in _DEP_KINDS and e.confidence == "unresolved":
             if e.bridge and e.bridge.get("missing"):
+                if e.bridge.get("mismatch"):  # a channel registered under another name: in bridges.mismatches
+                    continue
                 to = e.bridge.get("to") or {}
                 gaps.setdefault(e.from_id, []).append([e.bridge.get("name"), e.bridge.get("method"),
                                                       e.bridge["missing"], to.get("path"), to.get("line")])

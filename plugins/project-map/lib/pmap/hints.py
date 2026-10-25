@@ -3,8 +3,9 @@
 `pmap hook post-edit` runs after Claude Code's Edit / Write and Codex's apply_patch. It finds the functions and
 classes the edit touched and names, in a few lines, what depends on them elsewhere: callers in other files and the
 other side of every link between languages (the Swift or Kotlin handler of a Flutter channel method, the Rust
-function behind FFI or JNI, a channel method a platform does not handle). It says nothing when nothing outside the
-file depends on the change, and never repeats itself within a session.
+function behind FFI or JNI, a channel method a platform does not handle), and possible hand-written copies of the
+function in other languages (pmap/twins.py: a static guess from shared string literals, which may differ on purpose).
+It says nothing when nothing outside the file depends on the change, and never repeats itself within a session.
 
 The map comes from the cache the session-start hook writes (~/.pmap/cache); after an edit the cache is refreshed in
 the background, so the next note sees the code as it is now.
@@ -21,13 +22,14 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from pmap.models import ActualEdge, ActualMap, ActualNode
 
 MAX_SYMBOLS = 3
 MAX_ITEMS = 6
 MAX_CHARS = 2400
+TWINS_MAX_FILES = 20000  # above this the twin search costs more than a background refresh should
 HEADER_EXTS = (".h", ".hh", ".hpp", ".hxx", ".h++")
 SYNC_SCAN_FILES = 600  # without a usable cached map, a hook scans right away only a project this small
 SESSION_TTL = 2 * 24 * 3600
@@ -59,16 +61,78 @@ def save_cache(root: Path, actual: ActualMap, scan_seconds: float = 0.0) -> None
     edges = [[e.from_id, e.to_id, e.kind, e.confidence, e.location.path if e.location else None,
               e.location.line if e.location else 0, e.candidates, e.bridge]
              for e in actual.edges if e.kind in ("calls", "inherits") and (e.confidence != "unresolved" or e.bridge)]
+    started = time.time()
+    twins = _twins(root, actual)
+    scan_seconds += time.time() - started  # the refresh throttle must see what a refresh really costs
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         for target, data in ((path, {"root": str(root.resolve()), "saved": saved, "map": actual.to_dict()}),
                              (path.with_suffix(".idx.json"), {"saved": saved, "nodes": nodes, "edges": edges}),
+                             (path.with_suffix(".twins.json"), {"saved": saved, "twins": twins}),
                              (path.with_suffix(".meta.json"), {"saved": saved, "scan_seconds": scan_seconds})):
             tmp = target.with_suffix(f".{os.getpid()}.tmp")
             tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
             os.replace(tmp, target)
     except OSError:
         pass
+
+
+def _twins(root: Path, actual: ActualMap) -> Dict[str, object]:
+    """Possible copies in other languages (pmap/twins.py), for the note after an edit: only a map with two
+    languages or more can hold any, and a very big one is not searched on every refresh."""
+    from pmap.twins import find_twins, twins_for_hints
+
+    counts = [int(v.get("files") or 0) for v in actual.languages.values() if v.get("files")]
+    if len(counts) < 2 or sum(counts) > TWINS_MAX_FILES:
+        return {}
+    try:
+        return twins_for_hints(find_twins(actual, root))
+    except Exception:  # a note is never worth a failed cache
+        return {}
+
+
+def load_twins(root: Path) -> Dict[str, dict]:
+    try:
+        data = json.loads(cache_path(root).with_suffix(".twins.json").read_text(encoding="utf-8"))
+        return dict(data.get("twins") or {})
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def twin_lines(entry: dict, known: Sequence[str] = ()) -> List[str]:
+    """Possible copies of the edited function in other languages: where they are and how much they share, never
+    whether they are right or whether they must change too."""
+    others = [o for o in entry.get("others") or [] if isinstance(o, list) and len(o) >= 4]
+    if not others:
+        return []
+    lines = ["  possible copies in other languages (static: shared string literals; not run):"]
+    for o in others[:MAX_ITEMS]:
+        path, line, name, language = o[:4]
+        share = f"; shares {o[4]} of {entry.get('size', '?')} literals" if len(o) > 4 else ""
+        lines.append(f"    {path}:{line} {name} ({_lang_name(str(language))}{share})")
+    if len(others) > MAX_ITEMS:
+        lines.append(f"    (and {len(others) - MAX_ITEMS} more: pmap twins)")
+    lines.extend(f"  known difference: {k}" for k in known[:2])
+    lines.append("  if this change fixes behaviour, check them; copies may differ on purpose")
+    return lines
+
+
+def known_differences(root: Path, entry: dict, edited: str) -> List[str]:
+    """Comments in the other copies that say a difference is intended and name a key the edit touched."""
+    from pmap.twins_exec import DOUBT, INTENT
+    from pmap.twins_harvest import language_of, lex
+
+    keys = {a or b for a, b in re.findall(r'"([A-Za-z_][\w.-]+)"|\'([A-Za-z_][\w.-]+)\'', edited)}
+    out: List[str] = []
+    for o in entry.get("others") or []:
+        lang = language_of(str(o[0])) if keys else None
+        if not lang:
+            continue
+        for ln, text in lex(_read(root / str(o[0])), lang).comments:
+            if INTENT.search(text) and not DOUBT.search(text) and any(
+                    re.search(r"(?<![\w])" + re.escape(k) + r"(?![\w])", text) for k in keys):
+                out.append(f"{o[0]}:{ln}: {text.strip()[:120]}")
+    return sorted(set(out))
 
 
 def load_cache(root: Path) -> Tuple[Optional[ActualMap], float]:
@@ -154,6 +218,7 @@ class Change:
     old_lines: int  # lines the change replaced
     old_text: str = ""
     whole_file: bool = False
+    new_lines: int = 0  # lines the change wrote
 
 
 def _abs(value, cwd: Path) -> Optional[Path]:
@@ -203,7 +268,7 @@ def changes_from(payload: dict) -> List[Change]:
         old, new = str(edit.get("old_string") or ""), str(edit.get("new_string") or "")
         found = _line_of(text, new, bool(edit.get("replace_all"))) if new.strip() else []
         for start in found or [0]:  # 0: a deletion; only the names it declared can tell what it removed
-            out.append(Change(path, start, old.count("\n") + 1, old))
+            out.append(Change(path, start, old.count("\n") + 1, old, new_lines=new.count("\n") + 1))
     return out
 
 
@@ -232,7 +297,8 @@ def _patch_changes(patch: str, cwd: Path) -> List[Change]:
         if not start and hunk["before"]:
             anchor = _line_of(text, "\n".join(hunk["before"][-3:]), False)
             start = anchor[0] + min(3, len(hunk["before"])) if anchor else 0
-        out.append(Change(current[1], start, max(1, len(hunk["old"])), "\n".join(hunk["old"])))
+        out.append(Change(current[1], start, max(1, len(hunk["old"])), "\n".join(hunk["old"]),
+                          new_lines=len(hunk["new"])))
 
     for line in patch.splitlines():
         m = re.match(r"\*\*\* (Update|Add|Delete) File: (.+)", line)
@@ -368,20 +434,29 @@ class _Index:
             end = change.start + max(0, change.old_lines - 1)
             links_in = [e for e in links_in if int((e.bridge.get("to") or {}).get("line", 0)) == node.location.line_start
                         or change.start - 1 <= int((e.bridge.get("to") or {}).get("line", 0)) <= end + 1]
+        from pmap.langs.bridges import _unsent, mismatch_text
+
         for e in links_out:
             b = e.bridge or {}
             what = _what(b)
+            if b.get("missing") and b.get("mismatch"):  # a channel name another platform registers differently
+                lines.append(f"  ✗ {mismatch_text(e)}")
+                continue
             if b.get("missing"):
                 to = b.get("to") or {}
                 lines.append(f"  ! {what} is not handled in {b['missing']} (its other methods: {to.get('path')}:"
-                             f"{to.get('line')}) — a call fails there at run time")
+                             f"{to.get('line')}) — a call fails there at run time{_unsent(b.get('orphan'))}")
                 continue
             to = b.get("to") or {}
             lines.append(f"  → {to.get('path', self.path(e.to_id))}:{to.get('line', '?')}  {self.label(e.to_id)}"
                          f"  ({_lang(to.get('path', ''))}, {what}{', possible' if e.confidence != 'resolved' else ''})")
+            if b.get("mismatch"):
+                lines.append(f"    ✗ {mismatch_text(e)}")
         for e in links_in:
             where = f"{e.location.path}:{e.location.line}" if e.location else self.path(e.from_id)
             lines.append(f"  ← {where}  {self.label(e.from_id)}  ({_lang(where)}, {_what(e.bridge or {})})")
+            if (e.bridge or {}).get("mismatch"):
+                lines.append(f"    ✗ {mismatch_text(e)}")
         if links_in and any((e.bridge or {}).get("via") == "ffi" for e in links_in):
             for decl in self.headers.get(node.name, []):  # the C declaration other languages compile against
                 lines.append(f"  = {decl.location.path}:{decl.location.line_start}  declares {node.name} for C, C++ "
@@ -428,6 +503,12 @@ def _what(b: dict) -> str:
     if b.get("via") in ("channel", "event-channel", "message-channel", "pigeon"):
         return f"{via} {b.get('name')}{method}"
     return f"{via} {b.get('name')}"
+
+
+def _lang_name(language: str) -> str:
+    from pmap.langs.bridges import LANGUAGE_NAMES
+
+    return LANGUAGE_NAMES.get(language, language or "?")
 
 
 def _lang(path: str) -> str:
@@ -494,7 +575,9 @@ def post_edit_context(payload: dict) -> Optional[str]:
         index = _Index.from_map(actual)
     session = str(payload.get("session_id") or "")
     seen = _seen(session)
+    twins = load_twins(root)
     notes: List[List[str]] = []
+    depends = twinned = False
     for change in changes:
         try:
             rel = change.path.resolve().relative_to(root.resolve()).as_posix()
@@ -505,6 +588,15 @@ def post_edit_context(payload: dict) -> Optional[str]:
             if seen.get(node.id, 0) >= level:
                 continue
             note = index.note(node, signature, change)
+            depends = depends or bool(note)
+            twin: List[str] = []
+            if node.id in twins:
+                edited = "\n".join(_read(change.path).split("\n")[max(0, change.start - 1):
+                                                                  change.start - 1 + max(1, change.new_lines)])
+                twin = twin_lines(twins[node.id], known_differences(root, twins[node.id], edited))
+            if twin:
+                twinned = True
+                note = (note or [f"{index.label(node.id)} ({rel}:{node.location.line_start})"]) + twin
             if note:
                 seen[node.id] = level
                 notes.append(note)
@@ -513,7 +605,14 @@ def post_edit_context(payload: dict) -> Optional[str]:
         return None
     notes.sort(key=len, reverse=True)
     _remember(session, seen)
-    out = ["Method Project Map — code elsewhere depends on what you just changed; keep it in step:"]
+    if depends and twinned:
+        head = ("Method Project Map — code elsewhere depends on what you just changed (keep its callers and links "
+                "in step); possible copies in other languages are listed too:")
+    elif depends:
+        head = "Method Project Map — code elsewhere depends on what you just changed; keep it in step:"
+    else:
+        head = "Method Project Map — what you just changed may have hand-written copies in other languages:"
+    out = [head]
     for note in notes[:MAX_SYMBOLS]:
         out.extend(note)
     if len(notes) > MAX_SYMBOLS:

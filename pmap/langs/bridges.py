@@ -9,14 +9,26 @@ links into `calls` edges with a `bridge` record, e.g.
 - `resolved`: the names match exactly one target on that side;
 - `inferred`: several targets match, or the system picks the target (NetworkExtension, Android intents);
 - `unresolved` with `"missing": "<platform>"`: a channel method that a platform handling the channel does not handle.
+
+Where both ends are known for certain, the two sides are also compared, and an edge whose sides differ carries
+`"mismatch": {"kind", "detail"}` (see `mismatches`): a Kotlin `external fun` and its JNI function with another number
+of parameters or a type that cannot match (`String` against `jboolean`); a C ABI function whose Dart binding, call
+site or bound header declaration has another number of parameters than its definition (a header declaration is no
+call, so it is named in the detail of the function's links, `"declarations"`); a Dart channel name that no code of a
+platform folder of the same package registers while that platform registers a near name of the namespace that no
+Dart code uses (an unresolved edge to that registration). A gap whose platform handles a method no Dart code sends
+names it in `"orphan"`. Anything uncertain (macros, variadics, overloads, unknown type aliases, names built at run
+time, files the parser could not read fully) is skipped, never reported.
 """
 
 from __future__ import annotations
 
+import os
 import posixpath
 import re
 from bisect import bisect_right
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 from pmap.langs.base import Decl, FileFacts
@@ -68,6 +80,27 @@ def _blank_comments(text: str) -> str:
 def _literal(arg: str) -> Optional[str]:
     m = _PREFIXED_STR.fullmatch(arg.strip())
     return m.group("s") if m else None
+
+
+def _method_literal(arg: str, lang: str) -> Optional[str]:
+    """A method name written as one plain string; None when it is not one or when it is built at run time: Dart and
+    Kotlin `$x` / `${x}` (not in a Dart `r'...'` string), Swift `\\(x)`."""
+    arg = arg.strip()
+    value = _literal(arg)
+    if value is None:
+        return None
+    if lang == "swift" and "\\(" in value:
+        return None
+    if lang in ("dart", "kotlin") and not (lang == "dart" and arg[:1] == "r"):
+        i = 0
+        while i < len(value):
+            if value[i] == "\\":
+                i += 2
+                continue
+            if value[i] == "$":
+                return None
+            i += 1
+    return value
 
 
 def _clean_channel(name: str) -> str:
@@ -221,11 +254,264 @@ def _family(language: str) -> str:
 
 
 def platform_of(path: str, language: str) -> str:
-    """`android`, `ios`, `macos`, `windows`, `linux` from a Flutter-style folder, else the language."""
+    """`android`, `ios`, `macos`, `windows`, `linux` from a Flutter-style folder, else the language. Folders below a
+    source root are packages, not platforms (`src/main/java/com/acme/web/`, `Sources/Kit/linux/`)."""
     for part in path.split("/")[:-1]:
         if part in PLATFORM_DIRS:
             return part
+        if part in _SOURCE_ROOTS:
+            break
     return language
+
+
+_SOURCE_ROOTS = ("java", "kotlin", "Sources")
+
+
+def platform_name(platform: str) -> str:
+    return _PLATFORM_NAMES.get(platform) or LANGUAGE_NAMES.get(platform, platform)
+
+
+_PLATFORM_NAMES = {"ios": "iOS", "macos": "macOS", "android": "Android", "windows": "Windows", "linux": "Linux",
+                   "web": "Web"}
+
+
+# ====================================================================== comparing the two sides
+
+
+def _group(text: str, start: int, quotes: str = "\"'", angles: bool = True) -> Optional[Tuple[List[str], int]]:
+    """The top-level comma-separated parts inside the bracket at `start` (a trailing comma allowed) and the position
+    after its closing bracket; None when brackets or strings do not balance. `->` and `=>` are no brackets; with
+    angles=False `<` and `>` are left to the caller."""
+    stack: List[str] = []
+    parts: List[str] = []
+    i, n, begin = start, len(text), start + 1
+    while i < n:
+        c = text[i]
+        if c in quotes:
+            m = _STR.match(text, i)
+            if m is None:
+                return None
+            i = m.end()
+            continue
+        if c in "([{" or (angles and c == "<"):
+            stack.append(c)
+        elif c in ")]}" or (angles and c == ">" and text[i - 1] not in "-="):
+            if not stack or "([{<".index(stack.pop()) != ")]}>".index(c):
+                return None
+            if not stack:
+                parts.append(text[begin:i])
+                parts = [p.strip() for p in parts]
+                if parts[-1] == "":
+                    parts.pop()
+                return (parts, i + 1) if all(parts) else None
+        elif c == "," and len(stack) == 1:
+            parts.append(text[begin:i])
+            begin = i + 1
+        i += 1
+    return None
+
+
+_MACRO_LIKE = re.compile(r"[A-Z_][A-Z0-9_]*")
+_DEFINE = re.compile(r"(?m)^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)")
+# What may stand before a function's name on the line that declares or defines it (`static inline int32_t `,
+# `extern int ZEXPORT `, `void *`); `return x = f(` and `if (f(` are calls.
+_TYPE_HEAD = re.compile(r"[ \t]*(?:[A-Za-z_][\w:]*(?:[ \t]*<[^<>;()\n]*>)?[ \t\*&]+)+")
+_NOT_TYPES = {"return", "if", "while", "for", "switch", "else", "case", "do", "sizeof", "goto", "throw", "new",
+              "delete", "typedef", "co_return", "co_await", "co_yield"}
+
+
+def _params(text: Optional[str], lang: str, rel: str) -> Optional[List[str]]:
+    """The parameters the first `(...)` of a signature declares (`(void)` is none); None when that is not certain:
+    cut short, variadic, a macro, a parameter present only under a condition (Rust `#[cfg(...)]`, C `#if`), or `()`
+    in a C header or C file (no prototype)."""
+    if not text:
+        return None
+    start = text.find("(")
+    got = _group(text, start, '"' if lang in ("rust", "swift") else "\"'") if start >= 0 else None
+    if got is None:
+        return None
+    parts = got[0]
+    if lang == "rust" and any(re.search(r"#\s*\[\s*cfg", p) for p in parts):
+        return None
+    if lang in ("cpp", "c"):
+        if any("#" in p for p in parts):
+            return None
+        if parts == ["void"]:
+            return []
+        if not parts and rel.endswith((".c", ".h")):
+            return None
+        if any(_MACRO_LIKE.fullmatch(p) for p in parts):
+            return None
+    if any("..." in p for p in parts) and lang not in ("kotlin", "java"):
+        return None  # variadic (`...`, Go `...int`, Swift `Int...`); Java `String...` is one array parameter
+    return parts
+
+
+def _distance(a: str, b: str) -> int:
+    """Edits from a to b: a letter added, dropped or changed, or two neighbours swapped (`foucs` / `focus` is 1)."""
+    before: List[int] = []
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cost = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+            if i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
+                cost = min(cost, before[j - 2] + 1)
+            cur.append(cost)
+        before, prev = prev, cur
+    return prev[-1]
+
+
+def _pair(missing: List[str], orphans: List[Tuple[str, object]], near=None) -> Dict[str, Tuple[str, object, int]]:
+    """missing name -> (closest orphan name, its payload, how many other orphans went to it). Each orphan goes to the
+    missing name closest to it, so one orphan never stands beside two missing names; with `near(missing, orphan)`
+    an orphan goes only to a name near it."""
+    given: Dict[str, List[Tuple[int, str, object]]] = {}
+    for name, payload in orphans:
+        options = [m for m in missing if near is None or near(m, name)]
+        if not options:
+            continue
+        best = min(options, key=lambda m: (_distance(m, name), m))
+        given.setdefault(best, []).append((_distance(best, name), name, payload))
+    out = {}
+    for m, items in given.items():
+        _d, name, payload = min(items, key=lambda t: (t[0], t[1]))
+        out[m] = (name, payload, len(items) - 1)
+    return out
+
+
+def _near_name(a: str, b: str) -> bool:
+    """Two channel names of one namespace that differ by a slip: case, `_` / `-` / `.`, or a few letters for their
+    length (`levels` / `level`, `media_library` / `medialibrary`); `levels` / `carplay_state` are two channels."""
+    x, y = (re.sub(r"[_\-.]", "", n.rpartition("/")[2].lower()) for n in (a, b))
+    return _distance(x, y) <= max(1, max(len(x), len(y)) // 4)
+
+
+def _natural(text: str) -> tuple:
+    """A sort key that orders numbers inside text by value (`:9` before `:10`, `Parameter2` before `Parameter10`)."""
+    return tuple((0, int(t), "") if t.isdigit() else (1, 0, t) for t in re.split(r"(\d+)", text))
+
+
+def _quoted(name: str, text: str) -> bool:
+    """`name` appears in text as a whole string literal (`'audio/levels'` is not `'audio/level'`)."""
+    return name in text and re.search("['\"]" + re.escape(name) + "['\"]", text) is not None
+
+
+# JNI: what a Kotlin / Java parameter type is on the JVM, and what a JNI parameter type can receive. A category is
+# ("prim", width) or ("ref", "object" | "string" | "class" | "throwable" | "array" | "array:<element>"). A primitive is
+# compared by its size and whether it is an integer or a float (`i4`, `f8`): `Boolean` against `i8` or `Short`
+# against `u16` passes the same bits, `Int` against `jlong` or `jfloat` does not.
+_JVM_PRIMITIVES = ("boolean", "byte", "char", "short", "int", "long", "float", "double")
+_KOTLIN_PRIMITIVES = {p.capitalize(): p for p in _JVM_PRIMITIVES}
+_WIDTHS = {"boolean": "i1", "byte": "i1", "char": "i2", "short": "i2", "int": "i4", "long": "i8", "float": "f4",
+           "double": "f8"}
+_JNI_TYPES: Dict[str, Tuple[str, str]] = {"jsize": ("prim", "i4"), "jarray": ("ref", "array")}
+for _p in _JVM_PRIMITIVES:
+    _JNI_TYPES["j" + _p] = ("prim", _WIDTHS[_p])
+    _JNI_TYPES["j" + _p + "Array"] = _JNI_TYPES["J" + _p.capitalize() + "Array"] = ("ref", "array:" + _p)
+for _names, _cat in ((("jobject", "JObject"), ("ref", "object")), (("jclass", "JClass"), ("ref", "class")),
+                     (("jstring", "JString"), ("ref", "string")), (("jthrowable", "JThrowable"), ("ref", "throwable")),
+                     (("jobjectArray", "JObjectArray"), ("ref", "array:object"))):
+    for _n in _names:
+        _JNI_TYPES[_n] = _cat
+# Fixed-size native types (Rust `i64` is `jlong`); `usize`, `bool`, C `int` and `long` are left out.
+for _bits, _width in ((8, "i1"), (16, "i2"), (32, "i4"), (64, "i8")):
+    for _n in (f"i{_bits}", f"u{_bits}", f"int{_bits}_t", f"uint{_bits}_t"):
+        _JNI_TYPES[_n] = ("prim", _width)
+for _names, _width in ((("f32", "float"), "f4"), (("f64", "double"), "f8")):
+    for _n in _names:
+        _JNI_TYPES[_n] = ("prim", _width)
+
+
+def _jvm_param(part: str, lang: str) -> Tuple[str, Optional[str]]:
+    """(name, type as written) of a Kotlin `name: Type = x` or Java `final Type name`; type None when unknown."""
+    part = re.sub(r"@[\w.:]+(?:\s*\([^()]*\))?\s*", "", part).split("=", 1)[0].strip()
+    if lang == "kotlin":
+        name, sep, typ = part.partition(":")
+        name = name.split()[-1] if name.split() else ""
+        if not sep or re.search(r"\bvararg\b", part):
+            return name, None
+        return name, typ.strip()
+    words = [w for w in part.split() if w != "final"]
+    if len(words) < 2 or words[-1].endswith("]"):
+        return (words[-1] if words else ""), None
+    return words[-1], " ".join(words[:-1])
+
+
+def _jvm_category(typ: Optional[str], lang: str) -> Optional[Tuple[str, str]]:
+    if not typ:
+        return None
+    t = re.sub(r"\s+", "", typ)
+    if lang == "kotlin":  # any other name may be a typealias of anything: unknown
+        nullable = t.endswith("?")
+        t = t.rstrip("?")
+        t = t[len("kotlin."):] if t.startswith("kotlin.") else t
+        if t in _KOTLIN_PRIMITIVES:
+            return ("ref", "object") if nullable else ("prim", _WIDTHS[_KOTLIN_PRIMITIVES[t]])
+        if t == "String":
+            return ("ref", "string")
+        if t.endswith("Array") and t[:-5] in _KOTLIN_PRIMITIVES:
+            return ("ref", "array:" + _KOTLIN_PRIMITIVES[t[:-5]])
+        if t.startswith("Array<"):
+            return ("ref", "array:object")
+        return None
+    t = t[len("java.lang."):] if t.startswith("java.lang.") else t
+    for suffix in ("[]", "..."):
+        if t.endswith(suffix):
+            element = t[:-len(suffix)]
+            return ("ref", "array:" + (element if element in _JVM_PRIMITIVES else "object"))
+    if t in _JVM_PRIMITIVES:
+        return ("prim", _WIDTHS[t])
+    if t == "String":
+        return ("ref", "string")
+    if re.fullmatch(r"[A-Za-z_$][\w.$]*(?:<.*>)?", t):  # Java has no aliases: any other name is a class
+        return ("ref", "object")
+    return None
+
+
+def _native_param(part: str, lang: str) -> Tuple[str, Optional[str]]:
+    """(name, type) of a Rust `name: Type` or C `Type name` parameter."""
+    if lang == "rust":
+        name, sep, typ = part.partition(":")
+        return re.sub(r"\bmut\b", "", name).strip(), (typ.strip() if sep else None)
+    words = re.findall(r"[A-Za-z_]\w*|[*&\[]", re.sub(r"/\*.*?\*/", " ", part))
+    if any(w in ("*", "&", "[") for w in words):
+        return part, None
+    words = [w for w in words if w not in ("const", "volatile")]
+    if len(words) == 2:
+        return words[1], words[0]
+    return (part, words[0]) if len(words) == 1 else (part, None)
+
+
+def _jni_category(typ: Optional[str], lang: str) -> Optional[Tuple[str, str]]:
+    if not typ or "*" in typ or "&" in typ:
+        return None
+    t = typ.strip()
+    if lang == "rust":
+        t = t.split("<", 1)[0].strip().rsplit("::", 1)[-1].strip()
+    return _JNI_TYPES.get(t)
+
+
+def _contradicts(a: Optional[Tuple[str, str]], b: Optional[Tuple[str, str]]) -> bool:
+    """Only what can never be the same value: a primitive against a reference or a primitive of another size or
+    kind, a string against an array, arrays of different elements. A plain object reference matches any reference."""
+    if a is None or b is None:
+        return False
+    if a[0] != b[0]:
+        return True
+    if a[0] == "prim":
+        return a[1] != b[1]
+    x, y = a[1], b[1]
+    if "object" in (x, y):
+        return False
+    fx, fy = x.split(":")[0], y.split(":")[0]
+    if fx != fy:
+        return True
+    return fx == "array" and x != y and ":" in x and ":" in y
+
+
+def _count(n: object, word: str) -> str:
+    return f"{n} {word}" + ("" if n == 1 else "s")
 
 
 # ====================================================================== one file
@@ -309,6 +595,7 @@ class _Channel:
     var: Optional[str]
     end: int  # offset after the constructor call's `)`
     start: int
+    exact: bool = True  # False when the name is only the fixed part (`"simple_view/" + id`, `'audio/$id'`)
 
 
 @dataclass
@@ -328,6 +615,7 @@ class _Forwarder:
     channel: Optional[str]  # None: the channel is the receiver (an extension method on MethodChannel)
     certain: bool
     rel: str
+    line: int = 0  # where the forwarder is declared
 
 
 @dataclass
@@ -395,6 +683,10 @@ _NE_CALLS = [(re.compile(r"\.\s*startVPNTunnel\b"), "startTunnel"),
 NE_PROVIDERS = {"NEPacketTunnelProvider", "NEAppProxyProvider", "NETunnelProvider", "NEDNSProxyProvider",
                 "NEFilterDataProvider", "NEFilterControlProvider", "NETransparentProxyProvider", "NEProvider"}
 _INTENT = re.compile(r"\bIntent\s*\(\s*[^,()]+,\s*(\w+)::class\.java\s*\)|\bnew\s+Intent\s*\(\s*[^,()]+,\s*(\w+)\.class\s*\)")
+# Files read when a channel name is about to be reported as absent from a platform folder (`quoted_nearby`).
+_NEARBY_EXTS = {".m", ".mm", ".h", ".hh", ".hpp", ".c", ".cc", ".cpp", ".cxx", ".swift", ".kt", ".kts", ".java",
+                ".js", ".ts", ".rs", ".go", ".cs"}
+_SKIP_DIRS = {"build", "Pods", "DerivedData", "node_modules", "ephemeral", "target"}
 _INTENT_VERBS = {"startForegroundService": "onStartCommand", "startService": "onStartCommand", "bindService": "onBind",
                  "stopService": "onDestroy", "startActivityForResult": "onCreate", "startActivity": "onCreate"}
 
@@ -414,6 +706,10 @@ class _Linker:
         self.keys: Set[tuple] = set()
         self.drop: Set[Tuple[str, str]] = set()  # (owner, target symbol) of unresolved edges a link replaces
         self.retarget: Dict[Tuple[str, int, str], ActualEdge] = {}
+        self.unnamed: Set[Tuple[str, str]] = set()  # (platform or "dart", kind) of channels whose name is not known
+        self.dynamic_sends: Set[Optional[str]] = set()  # Dart channels (None: unknown) sent a method name not literal
+        self.abi_sites: Dict[str, List[tuple]] = {}  # C symbol -> (role, language, site, edge, count) of its users
+        self.disk: Dict[str, Optional[_Src]] = {}
 
     # ---------------------------------------------------------------- edges
 
@@ -455,6 +751,7 @@ class _Linker:
         exports = self.exports()
         self.c_abi(exports)
         self.jni(exports)
+        self.abi_contracts(exports)
         self.frb()
         self.uniffi()
         self.tauri()
@@ -479,23 +776,27 @@ class _Linker:
 
     # ---------------------------------------------------------------- platform channels
 
-    def channel_name(self, src: _Src, args: List[str], offset: Optional[int] = None) -> Optional[str]:
+    def channel_name(self, src: _Src, args: List[str], offset: Optional[int] = None) -> Tuple[Optional[str], bool]:
+        """The channel's name and whether it is the whole name (not the fixed part of one built at run time)."""
         for arg in args:
             arg = re.sub(r"^\s*name\s*:\s*", "", arg)
             value = _literal(arg)
+            whole = value is not None
             if value is None:  # "simple_view/" + id: the fixed part names the channel
                 m = _PREFIXED_STR.match(arg.strip())
                 value = m.group("s") if m and arg.strip()[m.end():].lstrip().startswith("+") else None
             if value:
-                return _clean_channel(value)
+                name = _clean_channel(value)
+                return name, whole and name == value
         for arg in args:
             ident = re.sub(r"^\s*name\s*:\s*", "", arg).strip().split(".")[-1]
             if re.fullmatch(r"[A-Za-z_]\w*", ident):
                 value = self.local_value(src, ident, offset) if offset is not None else None
                 value = value or self.constant(src, ident)
                 if value:
-                    return _clean_channel(value)
-        return None
+                    name = _clean_channel(value)
+                    return name, name == value
+        return None, False
 
     def local_value(self, src: _Src, name: str, offset: int) -> Optional[str]:
         """The string last assigned to `name` above offset in the same declaration (`final channelName = '…'`)."""
@@ -535,12 +836,13 @@ class _Linker:
                 if paren < 0:
                     continue
                 args, end = _args(src.text, paren)
-                name = self.channel_name(src, args, m.start())
+                name, whole = self.channel_name(src, args, m.start())
                 if not name:
+                    self.unnamed.add(("dart" if src.lang == "dart" else platform_of(src.rel, src.lang), m.group(1)))
                     continue
                 bind = _BIND.search(src.prefix(m.start()))
                 ch = _Channel(m.group(1), name, self.site(src, m.start()), bind.group(1) if bind else None, end,
-                              m.start())
+                              m.start(), whole)
                 declared.append(ch)
                 by_file.setdefault(src.rel, []).append(ch)
         if not declared:
@@ -591,9 +893,11 @@ class _Linker:
                     if kind == "Method":
                         paren = _open_paren(src.text, m.end())
                         args, _ = _args(src.text, paren) if paren >= 0 else ([], -1)
-                        method = _literal(args[0]) if args else None
-                        if method is None and args and src.lang == "dart":
-                            self.note_forwarder(src, recv_start, args[0], name, certain)
+                        method = _method_literal(args[0], src.lang) if args else None
+                        if method is None and src.lang == "dart":
+                            fw = self.note_forwarder(src, recv_start, args[0], name, certain) if args else None
+                            if fw is None or not fw.name.startswith("_"):
+                                self.dynamic_sends.add(name if certain else None)  # the methods sent: not all known
                     elif name is None:
                         continue  # `.send(` and `.receiveBroadcastStream(` only count on a known channel
                     if method:
@@ -602,8 +906,10 @@ class _Linker:
                 for m in _BARE_INVOKE.finditer(src.text):
                     paren = _open_paren(src.text, m.end())
                     args, _ = _args(src.text, paren) if paren >= 0 else ([], -1)
-                    if args and _literal(args[0]) is None:
-                        self.note_forwarder(src, m.start(), args[0], None, False)
+                    if args and _method_literal(args[0], "dart") is None:
+                        fw = self.note_forwarder(src, m.start(), args[0], None, False)
+                        if fw is None or not fw.name.startswith("_"):
+                            self.dynamic_sends.add(None)
             found = self.dispatch(src, by_file.get(src.rel, [])) if "MethodCall" in src.raw and "method" in src.raw \
                 else []
             handlers.extend(found)
@@ -625,20 +931,22 @@ class _Linker:
         calls.extend(self.forwarded_calls(channel_of))
         self.match_channels(declared, calls, handlers)
 
-    def note_forwarder(self, src: _Src, offset: int, arg: str, channel: Optional[str], certain: bool) -> None:
+    def note_forwarder(self, src: _Src, offset: int, arg: str, channel: Optional[str], certain: bool
+                       ) -> Optional[_Forwarder]:
         """`Future<void> _call(String method, …) => _channel.invokeMethod(method, …)`: the method name is a parameter,
         so each call of `_call('pause', …)` is a call of the channel method `pause`."""
         decl = src.decl_at(src.line(offset))
         param = arg.strip()
         if decl is None or not re.fullmatch(r"[A-Za-z_]\w*", param):
-            return
+            return None
         positional, named = _parameters(decl.signature or "")
         if param not in positional and param not in named:
-            return
+            return None
         index = positional.index(param) if param in positional else None
         key = (src.rel if decl.name.startswith("_") else "", decl.name)
         if key not in self.forwarders:
-            self.forwarders[key] = _Forwarder(decl.name, index, param, channel, certain, src.rel)
+            self.forwarders[key] = _Forwarder(decl.name, index, param, channel, certain, src.rel, decl.line_start)
+        return self.forwarders[key]
 
     def forwarded_calls(self, channel_of) -> List[_Call]:
         """Calls of forwarders with a literal method name; a forwarder may call another one (`_call` → `call`)."""
@@ -652,6 +960,14 @@ class _Linker:
                 done.add(key)
                 pattern = re.compile(r"(?:(\w+|\))\s*(?:\?\.|!\.|\.)\s*)?(?<![\w$])" + re.escape(fw.name)
                                      + r"\s*(?:<[^()]*?>)?\s*\(")
+                if key[0]:  # a private forwarder: all its uses are calls in its file (no tear-off, no `part` file)
+                    home = self.srcs.get(key[0])
+                    uses = re.findall(r"(?<![\w$])" + re.escape(fw.name) + r"(?![\w$])", home.text) if home else []
+                    if home is None or len(uses) != len(pattern.findall(home.text)) \
+                            or re.search(r"^\s*part\b", home.text, re.MULTILINE):
+                        self.dynamic_sends.add(fw.channel if fw.certain else None)
+                else:  # a public one may be called from anywhere, this project or not
+                    self.dynamic_sends.add(fw.channel if fw.certain else None)
                 for src in self.srcs.values():
                     if src.lang != "dart" or fw.name not in src.raw or (key[0] and src.rel != key[0]):
                         continue
@@ -659,8 +975,9 @@ class _Linker:
                         paren = m.end() - 1
                         args, _ = _args(src.text, paren)
                         arg = _argument(args, fw.index, fw.param)
-                        if arg is None:
-                            continue
+                        if arg is None or (src.rel == fw.rel and 0 <= src.line(m.start()) - fw.line <= 2
+                                           and re.fullmatch(r"[\w<>?,\s\[\]]+\s+\w+", arg.strip())):
+                            continue  # no method name, or the forwarder's own declaration (`String method`)
                         channel, certain = fw.channel, fw.certain
                         if channel is None:  # an extension on MethodChannel: the receiver is the channel
                             if not m.group(1):
@@ -668,12 +985,14 @@ class _Linker:
                             channel, certain = channel_of(src, m.group(1), m.start(1) + len(m.group(1)), "Method")
                             if channel is None:
                                 continue
-                        method = _literal(arg)
+                        method = _method_literal(arg, "dart")
                         start = m.start(1) if m.group(1) else m.start()
                         if method is not None:
                             out.append(_Call("Method", channel, certain, method, self.site(src, start)))
                         else:
-                            self.note_forwarder(src, start, arg, channel, certain)
+                            again = self.note_forwarder(src, start, arg, channel, certain)
+                            if again is None or not again.name.startswith("_"):
+                                self.dynamic_sends.add(channel if certain else None)
         return out
 
     def dispatch(self, src: _Src, mine: List[_Channel]) -> List[_Handler]:
@@ -769,6 +1088,7 @@ class _Linker:
         for h in handlers:
             if h.channel is not None:
                 handled.setdefault((h.channel, platform_of(h.site.src.rel, h.site.src.lang)), []).append(h)
+        found_gaps: List[Tuple[str, str, str, ActualEdge]] = []  # (channel, platform, method, edge) of Dart calls
         for call in calls:
             from_dart = call.site.src.lang == "dart"
             other_side = (lambda lang: lang != "dart") if from_dart else (lambda lang: lang == "dart")
@@ -799,10 +1119,11 @@ class _Linker:
                         continue
                     if only is not None and platform not in only:
                         continue
-                    self.link(call.site, f"unresolved:channel {channel}#{call.method}@{platform}", "unresolved",
-                              "channel", channel, hs[0].site, call.method,
-                              missing=f"{LANGUAGE_NAMES.get(hs[0].site.src.lang, hs[0].site.src.lang)} ({platform})"
-                              if platform != hs[0].site.src.lang else LANGUAGE_NAMES.get(platform, platform))
+                    gap = self.link(call.site, f"unresolved:channel {channel}#{call.method}@{platform}", "unresolved",
+                                    "channel", channel, hs[0].site, call.method,
+                                    missing=self.platform_label(platform, hs[0].site.src.lang))
+                    if gap is not None and from_dart:
+                        found_gaps.append((channel, platform, call.method, gap))
             else:
                 via = "event-channel" if call.kind == "Event" else "message-channel"
                 for ch in declared:
@@ -815,8 +1136,288 @@ class _Linker:
                                   pigeon.group(2))
                     else:
                         self.link(call.site, target.owner, "resolved", via, ch.name, target, call.method)
+        self.unsent_branches(found_gaps, calls, handled)
+        self.near_names(declared, calls, handlers)
+
+    @staticmethod
+    def platform_label(platform: str, lang: str) -> str:
+        """`Kotlin (android)`, or `Swift` for a folder that names no platform."""
+        name = LANGUAGE_NAMES.get(lang, lang)
+        return f"{name} ({platform})" if platform != lang else LANGUAGE_NAMES.get(platform, platform)
+
+    def unsent_branches(self, found: List[Tuple[str, str, str, ActualEdge]], calls: List[_Call],
+                        handled: Dict[Tuple[str, str], List[_Handler]]) -> None:
+        """A gap on a platform that has a branch for a method no Dart code sends on that channel (`"disconect"` beside
+        a missing `"disconnect"`): the gap names that branch. Skipped when Dart sends a method name that is not a
+        literal, since then the methods it sends are not all known, and when a Dart file this pass does not read
+        (a `part` file, generated code) quotes the branch's name."""
+        if not found or None in self.dynamic_sends:
+            return
+        sent: Dict[Optional[str], Set[str]] = {}
+        for c in calls:
+            if c.kind == "Method" and c.site.src.lang == "dart":
+                sent.setdefault(c.channel, set()).add(c.method)
+        groups: Dict[Tuple[str, str], List[Tuple[str, ActualEdge]]] = {}
+        for channel, platform, method, edge in found:
+            groups.setdefault((channel, platform), []).append((method, edge))
+        for (channel, platform), items in sorted(groups.items(), key=lambda kv: kv[0]):
+            if channel in self.dynamic_sends:
+                continue
+            known = sent.get(channel, set()) | sent.get(None, set())
+            branches: Dict[str, _Handler] = {}
+            for h in handled.get((channel, platform), []):
+                if h.certain and h.channel == channel and h.method != "*" and h.method not in known:
+                    branches.setdefault(h.method, h)
+            if not branches:
+                continue
+            paired = _pair(sorted({m for m, _ in items}), sorted(branches.items()))
+            for method, edge in items:
+                if method not in paired or edge.bridge is None or edge.location is None:
+                    continue
+                name, h, _others = paired[method]
+                if self.dart_quotes(edge.location.path, name):
+                    continue
+                edge.bridge["orphan"] = {"method": name, "path": h.site.src.rel,  # type: ignore[union-attr]
+                                         "line": h.site.line, "platform": platform}  # type: ignore[union-attr]
+
+    def near_names(self, declared: List[_Channel], calls: List[_Call], handlers: List[_Handler]) -> None:
+        """Dart listens on event channel `ns/x` (or calls method channel `ns/x`); no code of a platform folder of the
+        same package registers a channel under that name, and it registers `ns/y`, a name near it in the same
+        namespace that no Dart code uses: name both. A platform without such a channel lacks the feature and stays
+        silent; so does one where a channel name is unknown, where Dart builds a name of that namespace at run time,
+        where code outside the platform folders (a local Swift package, shared code) registers `ns/x`, or where any
+        file of the folder (one pmap does not read, too) quotes `ns/x`, or a Dart file it does not read quotes `ns/y`."""
+        dart_names = {c.name for c in declared if c.site.src.lang == "dart"}
+        platforms: Dict[str, List[_Channel]] = {}
+        for c in declared:
+            if c.site.src.lang != "dart":
+                platforms.setdefault(platform_of(c.site.src.rel, c.site.src.lang), []).append(c)
+        if not dart_names or not any(p in PLATFORM_DIRS for p in platforms):
+            return
+        # A name registered outside any platform folder may be built into every platform of its language.
+        shared: Dict[str, Set[str]] = {}
+        for platform, chans in platforms.items():
+            if platform not in PLATFORM_DIRS:
+                for c in chans:
+                    shared.setdefault(_family(c.site.src.lang), set()).add(c.name)
+        dart_srcs = [s for s in self.srcs.values() if s.lang == "dart"]
+        served = {(h.channel, platform_of(h.site.src.rel, h.site.src.lang)) for h in handlers
+                  if h.certain and h.channel is not None}
+        for kind, via, mkind in (("Event", "event-channel", "event-channel-name"),
+                                 ("Method", "channel", "channel-name")):
+            if ("dart", kind) in self.unnamed:
+                continue  # a Dart channel whose name is unknown may be the one a platform registers
+            loose = {c.name for c in declared if c.site.src.lang == "dart" and c.kind == kind and not c.exact}
+            wanted: Dict[str, List[_Call]] = {}
+            for call in calls:
+                if call.kind == kind and call.site.src.lang == "dart" and call.channel and call.certain:
+                    wanted.setdefault(call.channel, []).append(call)
+            dart_decls: Dict[str, _Channel] = {}
+            for c in declared:
+                if c.site.src.lang == "dart" and c.kind == kind:
+                    dart_decls.setdefault(c.name, c)
+            for platform, chans in sorted(platforms.items()):
+                if platform not in PLATFORM_DIRS or (platform, kind) in self.unnamed \
+                        or any(not c.exact for c in chans if c.kind == kind):
+                    continue
+                pool: Dict[str, _Channel] = {}  # the platform's channels of this kind that no Dart code uses
+                for c in chans:
+                    if c.kind != kind or "/" not in c.name or c.name in pool or c.name in dart_names \
+                            or any(c.name.startswith(p) for p in loose):  # `EventChannel('player/$kind')`
+                        continue
+                    if kind == "Method" and (c.name, platform) not in served:
+                        continue  # a method channel counts once it has a handler
+                    if kind == "Event" and "etStreamHandler" not in c.site.src.text:  # set… / C++ Set…
+                        continue
+                    pool[c.name] = c
+                registered = {c.name for c in chans}
+                for family in {_family(c.site.src.lang) for c in chans}:
+                    registered |= shared.get(family, set())
+                missing = [n for n in sorted(wanted) if n not in registered and n in dart_decls
+                           and dart_decls[n].exact]
+                pool = {n: c for n, c in pool.items()
+                        if any(m.rpartition("/")[0] == n.rpartition("/")[0] and _near_name(m, n) for m in missing)}
+                if not pool:
+                    continue
+                pool = {n: c for n, c in pool.items() if not any(_quoted(n, s.text) for s in dart_srcs)}
+                texts = [s.text for s in self.srcs.values()
+                         if s.lang != "dart" and platform_of(s.rel, s.lang) == platform]
+                missing = [n for n in missing if not any(_quoted(n, t) for t in texts)
+                           and self.used_on(wanted[n], platform)]
+                groups: Dict[Tuple[str, Optional[str]], Tuple[List[str], List[Tuple[str, _Channel]]]] = {}
+                for n in missing:
+                    key = (n.rpartition("/")[0], self.package_of(dart_decls[n].site.src.rel))
+                    groups.setdefault(key, ([], []))[0].append(n)
+                for n, c in sorted(pool.items()):
+                    key = (n.rpartition("/")[0], self.package_of(c.site.src.rel))
+                    if key in groups:
+                        groups[key][1].append((n, c))
+                for _key, (here, orphans) in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+                    if not orphans:
+                        continue
+                    for name, (other, ch, others) in sorted(_pair(here, orphans, _near_name).items()):
+                        dart, site = dart_decls[name], ch.site  # type: ignore[attr-defined]
+                        if self.quoted_nearby(site.src.rel, name) or self.dart_quotes(dart.site.src.rel, other):
+                            continue
+                        edge = self.link(dart.site, f"unresolved:{via} {name}@{platform}", "unresolved", via, name,
+                                         site, "listen" if kind == "Event" else None,
+                                         missing=self.platform_label(platform, site.src.lang))
+                        if edge is not None and edge.bridge is not None:
+                            edge.bridge["mismatch"] = {"kind": mkind, "detail": {"platform": platform,
+                                                                                 "registered": other,
+                                                                                 "others": others}}
+
+    def dart_quotes(self, rel: str, name: str) -> bool:
+        """A Dart file of rel's package that this pass does not read (a `part` or generated file, a folder pmap
+        skips, a constants file) quotes `name`; True also when the package is too big to read, since then the name
+        is not known to be unused."""
+        texts = self.unread_dart(self.package_of(rel) or "")
+        if texts is None:
+            return True
+        raw = name.encode()
+        return any(raw in data and _quoted(name, data.decode("utf-8", "replace")) for data in texts)
+
+    def unread_dart(self, folder: str) -> Optional[List[bytes]]:
+        if not hasattr(self, "_unread_dart"):
+            self._unread_dart: Dict[str, Optional[List[bytes]]] = {}
+        if folder not in self._unread_dart:
+            out: Optional[List[bytes]] = []
+            seen = 0
+            top = self.r.root / folder if folder else self.r.root
+            for dirpath, dirnames, filenames in os.walk(top):
+                dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+                for fname in filenames:
+                    if not fname.endswith(".dart") or fname.startswith("._"):
+                        continue
+                    seen += 1
+                    if seen > 4000:
+                        out = None
+                        break
+                    path = Path(dirpath) / fname
+                    try:
+                        rel = path.relative_to(self.r.root).as_posix()
+                    except ValueError:
+                        rel = ""
+                    if rel in self.srcs:
+                        continue
+                    try:
+                        out.append(path.read_bytes()[:2_000_000])  # type: ignore[union-attr]
+                    except OSError:
+                        continue
+                if out is None:
+                    break
+            self._unread_dart[folder] = out
+        return self._unread_dart[folder]
+
+    def package_of(self, rel: str) -> Optional[str]:
+        """The folder of the nearest pubspec.yaml above a file (a Flutter app or plugin); None when there is none."""
+        if not hasattr(self, "_packages"):
+            self._packages: Dict[str, Optional[str]] = {}
+        folder = posixpath.dirname(rel)
+        seen = []
+        while True:
+            if folder in self._packages:
+                found = self._packages[folder]
+                break
+            seen.append(folder)
+            if (self.r.root / folder / "pubspec.yaml").is_file():
+                found = folder
+                break
+            if not folder:
+                found = None
+                break
+            folder = posixpath.dirname(folder)
+        for f in seen:
+            self._packages[f] = found
+        return found
+
+    def quoted_nearby(self, rel: str, name: str) -> bool:
+        """Some file of the platform folder that holds rel (`ios`, `packages/a/android`; else its package) quotes
+        the name, files pmap does not read included (Objective-C, a constants file); True also when that folder is
+        too big to read, since then the name is not known to be absent."""
+        parts = rel.split("/")[:-1]
+        cut = next((i for i, p in enumerate(parts) if p in PLATFORM_DIRS), None)
+        folder = "/".join(parts[:cut + 1]) if cut is not None else (self.package_of(rel) or "")
+        top = self.r.root / folder if folder else self.r.root
+        read, raw = 0, name.encode()
+        for dirpath, dirnames, filenames in os.walk(top):
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+            for fname in filenames:
+                if posixpath.splitext(fname)[1].lower() not in _NEARBY_EXTS or fname.startswith("._"):
+                    continue
+                read += 1
+                if read > 4000:
+                    return True
+                try:
+                    data = (Path(dirpath) / fname).read_bytes()[:2_000_000]
+                except OSError:
+                    continue
+                if raw in data and _quoted(name, data.decode("utf-8", "replace")):
+                    return True
+        return False
+
+    def used_on(self, uses: List[_Call], platform: str) -> bool:
+        """Some of these Dart calls may run on the platform (no `Platform.isX` check or plugin class rules it out)."""
+        for call in uses:
+            only = self.platform_guard(call.site)
+            if only is None or platform in only:
+                return True
+        return False
 
     def platform_guard(self, site: _Site) -> Optional[Set[str]]:
+        """The platforms a Dart call may run on (see `platform_checks` and `plugin_platforms`); None: any."""
+        checks = self.platform_checks(site)
+        plugin = self.plugin_platforms(site)
+        if plugin is None:
+            return checks
+        return plugin if checks is None else checks & plugin
+
+    def plugin_platforms(self, site: _Site) -> Optional[Set[str]]:
+        """The platforms whose plugin registration loads the Dart code at site, from the pubspec.yaml of its package:
+        a platform's `dartPluginClass` (web: `pluginClass`) and its file (`dartFileName`, web: `fileName`) run on
+        that platform only. None when the code belongs to no such class or file."""
+        if site.src.lang != "dart":
+            return None
+        folder = self.package_of(site.src.rel)
+        if folder is None:
+            return None
+        classes, files = self.plugin_spec(folder)
+        if not classes and not files:
+            return None
+        rel = site.src.rel[len(folder) + 1:] if folder else site.src.rel
+        found = set(files[rel[4:]]) if rel.startswith("lib/") and rel[4:] in files else None
+        decl = site.src.decl_at(site.line)
+        while decl is not None:
+            if decl.kind == "class" and decl.name in classes:
+                found = set(classes[decl.name]) if found is None else found & classes[decl.name]
+                break
+            decl = decl.parent
+        return found
+
+    def plugin_spec(self, folder: str) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
+        """(Dart plugin class -> platforms, file below lib/ -> platforms) of the package in folder."""
+        if not hasattr(self, "_plugins"):
+            self._plugins: Dict[str, Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]] = {}
+        if folder not in self._plugins:
+            try:
+                text = (self.r.root / folder / "pubspec.yaml").read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                text = ""
+            classes: Dict[str, Set[str]] = {}
+            files: Dict[str, Set[str]] = {}
+            for platform, keys in _pubspec_platforms(text).items():
+                if platform not in PLATFORM_DIRS:
+                    continue
+                cls = keys.get("dartPluginClass") or (keys.get("pluginClass") if platform == "web" else None)
+                name = keys.get("dartFileName") or (keys.get("fileName") if platform == "web" else None)
+                if cls and cls != "none":
+                    classes.setdefault(cls, set()).add(platform)
+                if name:
+                    files.setdefault(name[2:] if name.startswith("./") else name, set()).add(platform)
+            self._plugins[folder] = (classes, files)
+        return self._plugins[folder]
+
+    def platform_checks(self, site: _Site) -> Optional[Set[str]]:
         """The platforms a Dart call is limited to by `Platform.isAndroid` / `TargetPlatform.iOS` checks in its
         function: those named, or none at all when a check is negated; None when the function checks nothing."""
         decl = site.src.decl_at(site.line)
@@ -948,7 +1549,8 @@ class _Linker:
                 if not found or (lang == "swift" and symbol in swift_names):
                     continue
                 owner = call.caller.node_id if call.caller is not None and call.caller.node_id else src.mod_id
-                self.ffi_link(_Site(src, call.line, owner), symbol, found)
+                site = _Site(src, call.line, owner)
+                self.note_abi(symbol, "passes", lang, site, self.ffi_link(site, symbol, found), None)
         for src in self.srcs.values():
             if src.lang != "dart" or ("lookup" not in src.raw and "@Native" not in src.raw):
                 continue
@@ -967,7 +1569,9 @@ class _Linker:
                 var = re.search(r"(\w+)\s*=\s*[\w.]*$", src.prefix(m.start()))
                 if var:
                     self.drop.add((site.owner, var.group(1)))
-                self.ffi_link(site, symbol, exports[symbol])
+                edge = self.ffi_link(site, symbol, exports[symbol])
+                count = self.dart_type_params(src, m.end()) if edge is not None else None
+                self.note_abi(symbol, "declares", "dart", site, edge, count)
             for m in _NATIVE.finditer(src.text):
                 symbol = None
                 paren = _open_paren(src.text, m.end())
@@ -980,10 +1584,59 @@ class _Linker:
                     continue
                 symbol = symbol or decl.name
                 if symbol in exports:
-                    self.ffi_link(_Site(src, src.line(m.start()), decl.node_id), symbol, exports[symbol])
+                    site = _Site(src, src.line(m.start()), decl.node_id)
+                    edge = self.ffi_link(site, symbol, exports[symbol])
+                    if edge is None:
+                        continue
+                    if src.text[m.end():m.end() + 1] == "<":
+                        count = self.dart_type_params(src, m.end())
+                    else:  # `@Native()`: the external function's own parameters, one for one
+                        parts = self.declared_params(decl, src.rel, "dart")
+                        count = None if parts is None or any(p[:1] in "{[" for p in parts) else len(parts)
+                    self.note_abi(symbol, "declares", "dart", site, edge, count)
 
-    def ffi_link(self, site: _Site, symbol: str, found: List[_Export]) -> None:
+    def note_abi(self, symbol: str, role: str, lang: str, site: _Site, edge: Optional[ActualEdge],
+                 count: Optional[int]) -> None:
+        """A use of a C ABI function, compared with its definition once every link is made (`abi_contracts`)."""
+        if edge is not None:
+            self.abi_sites.setdefault(symbol, []).append((role, lang, site, edge, count))
+
+    def dart_type_params(self, src: _Src, pos: int) -> Optional[int]:
+        """Parameters of the native function type in `lookupFunction<N, D>`, `lookup<NativeFunction<N>>` or
+        `@Native<N>` whose `<` is at pos (typedefs followed)."""
+        got = _group(src.text, pos) if src.text[pos:pos + 1] == "<" else None
+        return self.dart_native_count(src, got[0][0]) if got and got[0] else None
+
+    def dart_native_count(self, src: _Src, t: str, depth: int = 0) -> Optional[int]:
+        t = t.strip()
+        wrapped = re.fullmatch(r"(?:\w+\.)?NativeFunction\s*<(.*)>", t, re.DOTALL)
+        if wrapped:
+            t = wrapped.group(1).strip()
+        if re.fullmatch(r"[A-Za-z_$][\w$]*", t):
+            rhs = self.dart_typedef(src, t) if depth < 3 else None
+            return self.dart_native_count(src, rhs, depth + 1) if rhs else None
+        fn = re.search(r"\bFunction\s*\(", t)
+        if fn is None or "VarArgs" in t:
+            return None
+        got = _group(t, fn.end() - 1)
+        if got is None or t[got[1]:].strip() or any(p[:1] in "{[" for p in got[0]):
+            return None  # not one plain function type (`Function` inside the result type, named parameters)
+        return len(got[0])
+
+    def dart_typedef(self, src: _Src, name: str) -> Optional[str]:
+        pattern = re.compile(r"\btypedef\s+" + re.escape(name) + r"\s*=\s*([^;]+);")
+        found = pattern.findall(src.text)
+        if found or name.startswith("_"):  # `_X` is private to its library
+            return found[0] if len(found) == 1 else None
+        for other in self.srcs.values():
+            if other.lang == "dart" and other is not src and name in other.raw:
+                found.extend(pattern.findall(other.text))
+        return found[0] if len(found) == 1 else None
+
+    def ffi_link(self, site: _Site, symbol: str, found: List[_Export]) -> Optional[ActualEdge]:
+        """Link a use of a C symbol to its definition; the edge when the definition is the only one."""
         ids = sorted({x.node for x in found})
+        edge = None
         if len(ids) == 1:
             edge = self.link(site, ids[0], "resolved", "ffi", symbol, found[0].site)
             for e in self.r.edges if edge is not None else ():
@@ -998,6 +1651,7 @@ class _Linker:
         else:
             self.link(site, f"ambiguous:{symbol}", "inferred", "ffi", symbol, found[0].site, candidates=ids)
         self.drop.add((site.owner, symbol))
+        return edge
 
     def jni(self, exports: Dict[str, List[_Export]]) -> None:
         jni_exports = {s: xs for s, xs in exports.items() if s.startswith("Java_")}
@@ -1008,14 +1662,17 @@ class _Linker:
                 continue
             jvm_name = re.search(r'@file\s*:\s*JvmName\s*\(\s*"(\w+)"\s*\)', src.text)
             facade = jvm_name.group(1) if jvm_name else None
+            natives = []
             for decl in src.f.decls:
                 if decl.kind not in ("function", "method"):
                     continue
                 head = src.line_text(decl.line_start)
                 native = re.search(r"\bexternal\b[^\n]*\bfun\b", head) if src.lang == "kotlin" \
                     else re.search(r"\bnative\b[^(]*\(", head)
-                if not native:
-                    continue
+                if native:
+                    natives.append(decl)
+            names = [(d.parent.node_id if d.parent is not None else "", d.name) for d in natives]
+            for decl in natives:
                 classes = [p.name for p in _parents(decl)]
                 if not classes and src.lang == "kotlin":
                     stem = posixpath.basename(src.rel).rsplit(".", 1)[0]
@@ -1030,12 +1687,296 @@ class _Linker:
                         ids = sorted({x.node for x in found})
                         site = _Site(src, decl.line_start, decl.node_id)
                         if len(ids) == 1:
-                            self.link(site, ids[0], "resolved", "jni", symbol, found[0].site,
-                                      label=f"{'.'.join(parts)}.{decl.name}")
+                            label = f"{'.'.join(parts)}.{decl.name}"
+                            edge = self.link(site, ids[0], "resolved", "jni", symbol, found[0].site, label=label)
+                            overloaded = names.count((decl.parent.node_id if decl.parent is not None else "",
+                                                      decl.name)) > 1
+                            if edge is not None and not overloaded:
+                                self.jni_contract(src, decl, found[0], edge, label)
                         else:
                             self.link(site, f"ambiguous:{symbol}", "inferred", "jni", symbol, found[0].site,
                                       candidates=ids)
                         break
+
+    def jni_contract(self, src: _Src, decl: Decl, export: _Export, edge: ActualEdge, label: str) -> None:
+        """A Kotlin `external fun` / Java `native` method against its JNI function: the parameters after env and
+        class (or this) must be as many, and none of a type that cannot be the declared one."""
+        head = src.line_text(decl.line_start)
+        above = "\n".join(src.line_text(n) for n in range(max(1, decl.line_start - 2), decl.line_start))
+        if src.lang == "kotlin":
+            m = re.search(r"\bfun\b(.*?)\b" + re.escape(decl.name) + r"\s*\(", head)
+            if m is None or "." in m.group(1):
+                return  # an extension function: its receiver is one more parameter
+            if "JvmOverloads" in above + head:
+                return  # one JVM method per default argument
+            if re.search(r"\bsuspend\b", head) or re.search(r"(?:^|\s)context\s*\(", above + "\n" + head):
+                return  # a hidden Continuation or context receivers are more parameters
+            static = decl.parent is None or "JvmStatic" in head
+        else:
+            static = re.search(r"\bstatic\b", head) is not None
+        target = self.r.decl_by_id.get(export.node)
+        mine = self.declared_params(decl, src.rel, src.lang)
+        theirs = self.declared_params(target, export.site.src.rel, export.site.src.lang) if target else None
+        if mine is None or theirs is None or edge.bridge is None:
+            return
+        detail: Dict[str, object] = {"label": label, "lang": src.lang, "def_lang": export.site.src.lang,
+                                     "receiver": "class" if static else "this"}
+        if len(theirs) - 2 != len(mine):
+            detail.update(declares=len(mine), takes=len(theirs) - 2)
+            edge.bridge["mismatch"] = {"kind": "jni-arity", "detail": detail}
+            return
+        differ = []
+        for index, (ours, other) in enumerate(zip(mine, theirs[2:]), 1):
+            _name, ours_type = _jvm_param(ours, src.lang)
+            _other_name, other_type = _native_param(other, export.site.src.lang)
+            if _contradicts(_jvm_category(ours_type, src.lang), _jni_category(other_type, export.site.src.lang)):
+                differ.append({"index": index, "declares": re.sub(r"\s+", " ", ours),
+                               "takes": re.sub(r"\s+", " ", other)})
+        if differ:
+            detail["params"] = differ
+            edge.bridge["mismatch"] = {"kind": "jni-type", "detail": detail}
+
+    def declared_params(self, decl: Decl, rel: str, lang: str) -> Optional[List[str]]:
+        """A definition's or declaration's parameters, from its signature or, when that was cut short or holds a
+        comment (squashed onto one line, `// a, b` would hide where it ends), from its text without comments."""
+        sig = decl.signature or ""
+        if "//" not in sig and "/*" not in sig:
+            parts = _params(sig, lang, rel)
+            if parts is not None or not sig.endswith("…"):
+                return parts
+        src = self.source(rel)
+        if src is None or not src.text:
+            return None
+        start = src.starts[decl.line_start - 1] if 0 < decl.line_start <= len(src.starts) else 0
+        m = re.compile(r"\b" + re.escape(decl.name) + r"\b").search(src.text, start, start + 4000)
+        paren = _open_paren(src.text, m.end()) if m else -1
+        got = _group(src.text, paren, '"' if lang in ("rust", "swift") else "\"'") if paren >= 0 else None
+        return _params("(" + ", ".join(got[0]) + ")", lang, rel) if got else None
+
+    def source(self, rel: str) -> Optional[_Src]:
+        """A file's text: from this pass's sources, else read once (a Swift file calling C needs no hint)."""
+        src = self.srcs.get(rel)
+        if src is not None:
+            return src
+        if rel not in self.disk:
+            facts = self.r.files.get(rel)
+            try:
+                raw = (self.r.root / rel).read_bytes().decode("utf-8", "replace") if facts is not None else None
+            except OSError:
+                raw = None
+            self.disk[rel] = _Src(facts, raw) if facts is not None and raw is not None else None
+        return self.disk[rel]
+
+    def abi_contracts(self, exports: Dict[str, List[_Export]]) -> None:
+        """A C ABI function with one definition and links from other languages: its Dart bindings, its calls and
+        the C/C++ header declarations bound to it must have as many parameters. The difference is kept on the links
+        (a declaration is no call, so it gets no edge of its own: it is named in the detail of the links). Skipped
+        when unsure: several definitions (also one the parser missed, or two copies of the API's header), header
+        declarations that disagree among themselves, a macro of that name or among a call's arguments, default
+        arguments, a C++ function of that name in a namespace or class, a Swift function of that name in the file.
+        The costly checks run only for the functions where a difference was found."""
+        names = {s for s, xs in exports.items() if len(xs) == 1 and not s.startswith("Java_") and s in self.abi_sites}
+        if not names:
+            return
+        headers: Dict[str, List[Decl]] = {}
+        defined: Dict[str, int] = {}
+        shadowed: Set[str] = set()  # also a C++ method or namespaced function: a C++ call may mean that one
+        for facts in self.r.files.values():
+            if _family(facts.language) != "c":
+                continue
+            for d in facts.decls:
+                if d.name not in names:
+                    continue
+                if d.kind == "function" and d.parent is None and not d.receiver and not d.namespace:
+                    if d.declaration_only:
+                        headers.setdefault(d.name, []).append(d)
+                    else:
+                        defined[d.name] = defined.get(d.name, 0) + 1
+                elif d.kind in ("function", "method"):
+                    shadowed.add(d.name)
+        found: List[tuple] = []  # (symbol, export, takes, header declarations that differ, uses that differ)
+        for symbol in sorted(names):
+            x = exports[symbol][0]
+            target = self.r.decl_by_id.get(x.node)
+            in_c = _family(x.site.src.lang) == "c"
+            if target is None or defined.get(symbol, 0) > (1 if in_c else 0):
+                continue
+            decls = headers.get(symbol, [])
+            if in_c and len({posixpath.dirname(self.r.file_of.get(d.node_id, "")) for d in decls}) > 1:
+                continue  # two copies of the API's header: maybe two libraries
+            takes = self.declared_params(target, x.site.src.rel, x.site.src.lang)
+            if takes is None:
+                continue
+            declared = [(d, self.declared_params(d, self.r.file_of.get(d.node_id, ""), "cpp")) for d in decls]
+            if len({len(p) for _d, p in declared if p is not None}) > 1:
+                continue  # the declarations disagree among themselves
+            defaults = any("=" in part for _d, p in declared for part in p or [])
+            uses = []
+            for role, lang, site, edge, count in self.abi_sites[symbol]:
+                args: List[str] = []
+                if role == "passes":
+                    count, args = self.passed_args(site, symbol, lang, defaults or (lang == "cpp" and symbol in shadowed))
+                if count is not None and count != len(takes):
+                    uses.append((role, lang, site, edge, count, args))
+            differ = [(d, len(p)) for d, p in declared if p is not None and len(p) != len(takes)]
+            if uses or differ:
+                found.append((symbol, x, len(takes), differ, uses))
+        if not found:
+            return
+        index = self.c_index({symbol for symbol, *_rest in found})
+        for symbol, x, takes, differ, uses in found:
+            if symbol in index["defines"] or symbol in index["elsewhere"]:
+                continue  # a macro of that name, or a definition the parser did not take
+            if _family(x.site.src.lang) == "c" and symbol in index["unsure"]:
+                continue
+            uses = [u for u in uses if not (_family(u[1]) == "c" and any(w in index["defines"] for a in u[5]
+                                                                          for w in re.findall(r"[A-Za-z_]\w*", a)))]
+            differ = [(d, n) for d, n in differ if self.bound_header(self.r.file_of.get(d.node_id, ""), symbol)]
+            detail: Dict[str, object] = {"def_lang": x.site.src.lang, "takes": takes}
+            if differ:
+                at = {id(d): self.r.file_of.get(d.node_id, "") for d, _n in differ}
+                detail["declarations"] = [
+                    {"at": f"{at[id(d)]}:{d.line_start}", "count": n,
+                     "lang": self.r.files[at[id(d)]].language if at[id(d)] in self.r.files else "cpp"}
+                    for d, n in sorted(differ, key=lambda dn: (at[id(dn[0])], dn[0].line_start))]
+            own = {id(u[3]): u for u in uses}
+            for _role, _lang, _site, edge, _count in self.abi_sites[symbol]:
+                if edge.bridge is None or (id(edge) not in own and not differ):
+                    continue
+                mine = dict(detail)
+                if id(edge) in own:
+                    role, lang, _s, _e, count, _args = own[id(edge)]
+                    mine.update(role=role, lang=lang, count=count)
+                edge.bridge["mismatch"] = {"kind": "c-arity", "detail": mine}
+
+    def passed_args(self, site: _Site, symbol: str, lang: str, unsure: bool) -> Tuple[Optional[int], List[str]]:
+        """(arguments the call passes, their text) or (None, []) when that is not certain (see `passed`); a Swift
+        file that declares a function or closure of that name (a nested `func`, a `let`) may call that one."""
+        src = self.source(site.src.rel)
+        if unsure or src is None:
+            return None, []
+        if lang == "swift" and re.search(r"\b(?:func|let|var)\s+" + re.escape(symbol) + r"\b", src.text):
+            return None, []
+        got = self.passed(src, site.line, symbol, lang)
+        return (None, []) if got is None else (len(got), got)
+
+    def passed(self, src: _Src, line: int, symbol: str, lang: str) -> Optional[List[str]]:
+        """The arguments the call of `symbol` on `line` passes; None unless the call text leaves no doubt (one call
+        of it on the line, brackets that balance, no `<`, no macro-like argument, no preprocessor line inside, no
+        Swift trailing closure). Arguments #defined elsewhere in the project are checked by the caller."""
+        if not 0 < line <= len(src.starts):
+            return None
+        start = src.starts[line - 1]
+        end = src.starts[line] if line < len(src.starts) else len(src.text)
+        text = src.text[start:end]
+        c_family = _family(lang) == "c"
+        if c_family and text.lstrip().startswith("#"):
+            return None
+        prefix = r"\bC\s*\.\s*" if lang == "go" else r"(?<![\w$.>:])"
+        hits = list(re.finditer(prefix + re.escape(symbol) + r"\s*\(", text))
+        if len(hits) != 1 or len(re.findall(r"\b" + re.escape(symbol) + r"\b", text)) != 1:
+            return None
+        paren = start + hits[0].end() - 1
+        got = _group(src.text, paren, '"' if lang == "swift" else "\"'`" if lang == "go" else "\"'", angles=False)
+        if got is None:
+            return None
+        parts, after = got
+        if c_family and re.search(r"(?m)^[ \t]*#", src.text[paren:after]):
+            return None  # `#if` / `#ifdef` inside the argument list
+        if any("<" in p or "..." in p for p in parts):
+            return None
+        if lang == "swift" and (src.text[after:after + 200].lstrip().startswith("{")
+                                or any(re.match(r"\s*\w+\s*:(?!:)", p) for p in parts)):
+            return None  # a trailing closure is one more argument; labels belong to a Swift function
+        if (c_family or lang == "go") and any((_MACRO_LIKE.fullmatch(p) and p != "NULL")
+                                               or re.match(r"[A-Z_][A-Z0-9_]*\s*\(", p) for p in parts):
+            return None  # a macro may stand for several arguments
+        return parts
+
+    def c_index(self, symbols: Set[str]) -> Dict[str, Set[str]]:
+        """What the C and C++ files of the project (all of them, read for this when the pass holds no text) say about
+        these functions: {"defines": every name a `#define` gives, "elsewhere": symbols defined (a body follows) where
+        the parser found no declaration of that name, "unsure": symbols declared or defined in a file the parser
+        could not read fully, where it found no declaration (it may have missed a definition there)}."""
+        defines: Set[str] = set()
+        elsewhere: Set[str] = set()
+        unsure: Set[str] = set()
+        call = re.compile(r"(?<![\w$.>:~])(" + "|".join(re.escape(s) for s in sorted(symbols, key=len, reverse=True))
+                          + r")\s*\(")
+        for rel, facts in self.r.files.items():
+            if _family(facts.language) != "c":
+                continue
+            src = self.srcs.get(rel)
+            if src is not None:
+                raw = src.raw
+            else:
+                try:
+                    raw = (self.r.root / rel).read_bytes().decode("utf-8", "replace")
+                except OSError:
+                    continue
+            if "define" in raw:
+                defines.update(_DEFINE.findall(raw))
+            if not any(s in raw for s in symbols):
+                continue
+            text = src.text if src is not None else _blank_comments(raw)
+            starts: Optional[List[int]] = None
+            for m in call.finditer(text):
+                symbol = m.group(1)
+                head = text[text.rfind("\n", 0, m.start()) + 1:m.start()]
+                if head and (not _TYPE_HEAD.fullmatch(head) or set(re.findall(r"\w+", head)) & _NOT_TYPES):
+                    continue  # a call, not a declaration or definition
+                if starts is None:
+                    starts = [0] + [n.end() for n in re.finditer("\n", text)]
+                line = bisect_right(starts, m.start())
+                if any(d.name == symbol and d.line_start <= line <= d.line_start + 3 for d in facts.decls):
+                    continue  # one the parser took (the definition, a declaration, a method or namespaced one)
+                got = _group(text, m.end() - 1, angles=False)
+                if got is not None and re.match(r"\s*(?:const\s*)?\{", text[got[1]:got[1] + 200]):
+                    elsewhere.add(symbol)
+                if facts.syntax_errors:
+                    unsure.add(symbol)
+        return {"defines": defines, "elsewhere": elsewhere, "unsure": unsure}
+
+    def bound_header(self, rel: str, symbol: str) -> bool:
+        """The header is known to declare the functions of the other language: the resolver bound a C/C++ call to
+        one of its declarations that is defined there, a C/C++ caller of `symbol` includes it, or a Swift bridging
+        header or module map names it."""
+        if not hasattr(self, "_bound"):
+            self._bound: Set[str] = {self.r.file_of.get(key[2], "") for key in self.retarget}
+        if rel in self._bound:
+            return True
+        base = posixpath.basename(rel)
+        include = re.compile(r'(?m)^[ \t]*#[ \t]*(?:include|import)[ \t]*["<](?:[^">\n]*/)?' + re.escape(base) + '[">]')
+        callers = {u[2].src.rel for u in self.abi_sites.get(symbol, []) if _family(u[1]) == "c"}
+        for other in sorted(callers):
+            src = self.source(other)
+            if src is not None and base in src.raw and include.search(src.raw):
+                return True
+        for _path, text in self.umbrella_files():
+            if base in text and (include.search(text) or re.search(r'\bheader\s+"(?:[^"\n]*/)?' + re.escape(base)
+                                                                    + '"', text)):
+                return True
+        return False
+
+    def umbrella_files(self) -> List[Tuple[str, str]]:
+        """Swift bridging headers and module maps of the project: (path, text)."""
+        if not hasattr(self, "_umbrellas"):
+            found: List[Tuple[str, str]] = []
+            seen = 0
+            for dirpath, dirnames, filenames in os.walk(self.r.root):
+                dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+                seen += len(filenames)
+                if seen > 200_000:
+                    break
+                for fname in filenames:
+                    if fname.endswith(("Bridging-Header.h", ".modulemap")) and not fname.startswith("._"):
+                        try:
+                            found.append((fname, (Path(dirpath) / fname).read_text(encoding="utf-8",
+                                                                                   errors="replace")))
+                        except OSError:
+                            continue
+            self._umbrellas = found
+        return self._umbrellas
 
     # ---------------------------------------------------------------- generated bindings
 
@@ -1162,11 +2103,28 @@ class _Linker:
                     site = self.site(src, m.start())
                     if not found or any(site.owner == d.node_id for d in found):
                         continue
+                    found = self.nearest(src.rel, found)
                     ids = sorted(d.node_id for d in found)
                     self.link(site, ids[0] if len(ids) == 1 else f"ambiguous:{target}", "inferred",
                               "network-extension", m.group(0).lstrip(". \t").split("(")[0], self.decl_site(found[0]),
                               candidates=ids)
                     self.drop_unresolved_at(site, m.group(0).lstrip(". \t").split("(")[0])
+
+    def nearest(self, rel: str, decls: List[Decl]) -> List[Decl]:
+        """The providers sharing the most folders with the caller: an app starts its own extension, so the macOS
+        app (`macos/Runner`, `MacOS/App`) reaches the macOS provider, not the iOS one."""
+        here = [p.lower() for p in rel.split("/")[:-1]]
+
+        def shared(decl: Decl) -> int:
+            n = 0
+            for a, b in zip(here, self.r.file_of.get(decl.node_id, "").lower().split("/")[:-1]):
+                if a != b:
+                    break
+                n += 1
+            return n
+
+        best = max(shared(d) for d in decls)
+        return [d for d in decls if shared(d) == best]
 
     def is_provider(self, cls: Decl) -> bool:
         seen = set()
@@ -1227,6 +2185,30 @@ class _Linker:
         return None
 
 
+def _pubspec_platforms(text: str) -> Dict[str, Dict[str, str]]:
+    """`flutter: plugin: platforms:` of a pubspec.yaml: platform -> its plain keys (`dartPluginClass: X`, …)."""
+    out: Dict[str, Dict[str, str]] = {}
+    if "platforms" not in text:
+        return out
+    path: List[Tuple[int, str]] = []
+    for line in text.splitlines():
+        if line.lstrip().startswith(("#", "- ")) or not line.strip():
+            continue
+        line = re.sub(r"\s+#.*$", "", line).rstrip()
+        m = re.match(r"(\s*)([\w.-]+)\s*:(?:\s+(.*))?$", line)
+        if m is None:
+            continue
+        indent = len(m.group(1).expandtabs())
+        while path and path[-1][0] >= indent:
+            path.pop()
+        keys = [k for _i, k in path]
+        value = (m.group(3) or "").strip().strip("'\"")
+        if keys[:3] == ["flutter", "plugin", "platforms"] and len(keys) == 4 and value:
+            out.setdefault(keys[3], {})[m.group(2)] = value
+        path.append((indent, m.group(2)))
+    return out
+
+
 def _parents(decl: Decl) -> List[Decl]:
     out, d = [], decl.parent
     while d is not None:
@@ -1260,7 +2242,135 @@ def bridge_edges(actual: ActualMap) -> List[ActualEdge]:
 
 def gaps(actual: ActualMap) -> List[ActualEdge]:
     """Channel methods a platform does not handle."""
-    return [e for e in actual.edges if e.bridge and e.bridge.get("missing")]
+    return [e for e in actual.edges if e.bridge and e.bridge.get("missing") and not e.bridge.get("mismatch")]
+
+
+def mismatches(actual: ActualMap) -> List[ActualEdge]:
+    """Links whose two sides are both known and do not agree (parameter counts, JNI types, channel names)."""
+    return [e for e in actual.edges if e.bridge and e.bridge.get("mismatch")]
+
+
+def problems(actual: ActualMap) -> List[ActualEdge]:
+    """Gaps and mismatches: what `pmap check --strict` fails on."""
+    return gaps(actual) + mismatches(actual)
+
+
+def _is_link(edge: ActualEdge) -> bool:
+    """An edge that reaches the other side: not a gap or a channel registered under another name."""
+    b = edge.bridge or {}
+    return bool(b) and not b.get("missing")
+
+
+_CHANNEL_MISMATCHES = ("channel-name", "event-channel-name")
+
+
+def _at(edge: ActualEdge) -> str:
+    return f"{edge.location.path}:{edge.location.line}" if edge.location else "?"
+
+
+def _there(bridge: dict) -> str:
+    to = bridge.get("to") or {}
+    return f"{to.get('path')}:{to.get('line')}" if to else "?"
+
+
+def _lang_name(lang: object) -> str:
+    return LANGUAGE_NAMES.get(str(lang), str(lang))
+
+
+def _c_sites(edge: ActualEdge) -> List[Dict[str, object]]:
+    """The sites a c-arity difference names: the header declarations bound to the function, then the edge's own
+    site when it differs: [{"at", "role", "lang", "count"}]."""
+    d = ((edge.bridge or {}).get("mismatch") or {}).get("detail") or {}
+    sites = [{"at": h.get("at"), "role": "declares", "lang": h.get("lang"), "count": h.get("count")}
+             for h in d.get("declarations") or []]
+    if d.get("role"):
+        sites.append({"at": _at(edge), "role": d.get("role"), "lang": d.get("lang"), "count": d.get("count")})
+    return sites
+
+
+def _c_text(name: object, def_lang: object, takes: object, there: str, sites: List[Dict[str, object]]) -> str:
+    return (f"C ABI {name}: {_lang_name(def_lang)} takes {_count(takes, 'parameter')} ({there}); "
+            + "; ".join(f"{s['at']} {s['role']} {s['count']}" for s in sites))
+
+
+def mismatch_text(edge: ActualEdge) -> str:
+    """One line of facts for an edge whose sides differ (empty for any other edge), e.g.
+    `JNI NativeCore.setVolume: Kotlin declares 2 parameters (…NativeCore.kt:14), Rust takes 1 after env and this
+    (rust/src/jni.rs:23)`. Never which side is right."""
+    b = edge.bridge or {}
+    m = b.get("mismatch") or {}
+    d = m.get("detail") or {}
+    kind, at, there = m.get("kind"), _at(edge), _there(b)
+    if kind == "jni-arity":
+        takes, receiver = int(d.get("takes", 0)), "this" if d.get("receiver") == "this" else "class"
+        tail = f"takes {takes} after env and {receiver}" if takes >= 0 else \
+            f"takes {takes + 2} in all, fewer than env and {receiver}"
+        return (f"JNI {d.get('label')}: {_lang_name(d.get('lang'))} declares {_count(d.get('declares'), 'parameter')} "
+                f"({at}), {_lang_name(d.get('def_lang'))} {tail} ({there})")
+    if kind == "jni-type":
+        params = list(d.get("params") or [])
+        if not params:
+            return ""
+        first, rest = params[0], params[1:]
+        more = "".join(f"; parameter {p.get('index')}: {p.get('declares')} against {p.get('takes')}" for p in rest)
+        return (f"JNI {d.get('label')}: {_lang_name(d.get('lang'))} declares parameter {first.get('index')} as "
+                f"{first.get('declares')} ({at}), {_lang_name(d.get('def_lang'))} takes it as {first.get('takes')} "
+                f"({there}){more}")
+    if kind == "c-arity":
+        sites = _c_sites(edge)
+        return _c_text(b.get("name"), d.get("def_lang"), d.get("takes"), there, sites) if sites else ""
+    if kind in _CHANNEL_MISMATCHES:
+        event = kind == "event-channel-name"
+        others = int(d.get("others") or 0)
+        also = (f" (and {others} more channel{'s' if others != 1 else ''} of that namespace that no Dart code uses)"
+                if others else "")
+        where = platform_name(str(d.get("platform")))
+        return (f"{'event channel' if event else 'channel'} {b.get('name')} ({at}): no {where} code in this project "
+                f"{'registers this name' if event else 'registers a handler under this name'}; {where} code "
+                f"{'registers' if event else 'handles'} {d.get('registered')}, which no Dart code "
+                f"{'listens to' if event else 'calls'} ({there}){also}")
+    return ""
+
+
+def mismatch_list(actual: ActualMap) -> List[Dict[str, object]]:
+    """The mismatches, one per JNI function or channel and one per C symbol (its sites together, each once),
+    sorted: [{"kind", "name", "text", "at", "to", "detail" | "sites", "short"?}]."""
+    out: List[Dict[str, object]] = []
+    symbols: Dict[str, Dict[str, object]] = {}
+    for e in mismatches(actual):
+        b = e.bridge or {}
+        m = b.get("mismatch") or {}
+        d = dict(m.get("detail") or {})
+        if m.get("kind") == "c-arity":
+            entry = symbols.get(str(b.get("name")))
+            if entry is None:
+                entry = symbols[str(b.get("name"))] = {"kind": "c-arity", "name": b.get("name"), "to": _there(b),
+                                                       "def_lang": d.get("def_lang"), "takes": d.get("takes"),
+                                                       "sites": {}}
+            for site in _c_sites(e):
+                entry["sites"].setdefault((site["at"], site["role"]), site)  # type: ignore[union-attr]
+            continue
+        text = mismatch_text(e)
+        if text:
+            out.append({"kind": m.get("kind"), "name": b.get("name"), "text": text, "at": _at(e), "to": _there(b),
+                        "detail": d})
+    for entry in symbols.values():
+        sites = sorted(entry["sites"].values(),  # type: ignore[union-attr]
+                       key=lambda s: (s["role"] != "declares", s["lang"] == "dart", _natural(str(s["at"]))))
+        if not sites:
+            continue
+        entry["sites"] = sites
+        entry["at"] = sites[0]["at"]
+        entry["text"] = _c_text(entry["name"], entry["def_lang"], entry["takes"], str(entry["to"]), sites)
+        if len(sites) > _SHORT_SITES:  # the overview keeps its budget: `pmap check` lists every site
+            entry["short"] = _c_text(entry["name"], entry["def_lang"], entry["takes"], str(entry["to"]),
+                                     sites[:_SHORT_SITES]) + f"; +{len(sites) - _SHORT_SITES} more"
+        out.append(entry)
+    return sorted(out, key=lambda m: _natural(str(m["text"])))
+
+
+_SHORT_SITES = 3
+_OVERVIEW_MISMATCHES = 3
 
 
 def describe(edge: ActualEdge) -> str:
@@ -1273,7 +2383,10 @@ def describe(edge: ActualEdge) -> str:
     to = b.get("to") or {}
     where = f" -> {to.get('path')}:{to.get('line')}" if to and not b.get("missing") else ""
     missing = f" (not handled in {b['missing']})" if b.get("missing") else ""
-    return f" via {VIA_NAMES.get(str(b.get('via')), b.get('via'))} {b.get('name')}{method}{where}{missing}"
+    unsent = _unsent(b.get("orphan"))
+    differs = f" — {mismatch_text(edge)}" if b.get("mismatch") else ""
+    return f" via {VIA_NAMES.get(str(b.get('via')), b.get('via'))} {b.get('name')}{method}{where}{missing}{unsent}" \
+           f"{differs}"
 
 
 def format_check(actual: ActualMap) -> str:
@@ -1283,32 +2396,36 @@ def format_check(actual: ActualMap) -> str:
         return ""
     kinds: Dict[str, int] = {}
     for e in edges:
-        if not (e.bridge or {}).get("missing"):
+        if _is_link(e):
             via = VIA_NAMES.get(str(e.bridge.get("via")), str(e.bridge.get("via")))  # type: ignore[union-attr]
             kinds[via] = kinds.get(via, 0) + 1
-    lines = [f"Links between languages: {sum(kinds.values())} (" +
-             ", ".join(f"{k} {v}" for k, v in sorted(kinds.items(), key=lambda kv: -kv[1])) + ")"]
-    missing = gaps(actual)
-    if missing:
+    lines = [f"Links between languages: {sum(kinds.values())}" + (" (" + ", ".join(
+        f"{k} {v}" for k, v in sorted(kinds.items(), key=lambda kv: -kv[1])) + ")" if kinds else "")]
+    data = summary(actual)
+    found = data["mismatches"]
+    if data["gaps"]:
         lines.append("[!] GAPS (a platform that handles the channel does not handle this method):")
-        for line in summary_lines(actual, limit=len(missing) + 1)[:len(missing)]:
-            lines.append("  ✗ " + line[len("[GAP] "):])
-    else:
+        lines.extend("  ✗ " + _gap_line(gap)[len("[GAP] "):] for gap in data["gaps"])
+    elif not any(m["kind"] in _CHANNEL_MISMATCHES for m in found):
         lines.append("[OK] Every channel method called from one side is handled on each platform of the other side.")
+    if found:
+        lines.append("[!] SIGNATURES AND NAMES THAT DIFFER (both sides are known and do not agree):")
+        lines.extend(f"  ✗ {m['text']}" for m in found)
     return "\n".join(lines) + "\n"
 
 
 def check_dict(actual: ActualMap) -> Dict[str, object]:
     edges = bridge_edges(actual)
-    return {"links": sum(1 for e in edges if not (e.bridge or {}).get("missing")),
+    return {"links": sum(1 for e in edges if _is_link(e)),
             "gaps": [{"from": e.from_id, "at": f"{e.location.path}:{e.location.line}" if e.location else None,
-                      **(e.bridge or {})} for e in gaps(actual)]}
+                      **(e.bridge or {})} for e in gaps(actual)],
+            "mismatches": mismatch_list(actual)}
 
 
 def summary(actual: ActualMap) -> Dict[str, list]:
-    """The links grouped by kind (channels one by one) and the gaps, for the overview, `pmap check` and the web map:
-    {"groups": [{"via", "name", "dirs": [[from language, [to languages]]], "items": [...]}],
-     "gaps": [{"name", "method", "from", "at", "missing", "to"}]}."""
+    """The links grouped by kind (channels one by one), the gaps and the mismatches, for the overview, `pmap check`
+    and the web map: {"groups": [{"via", "name", "dirs": [[from language, [to languages]]], "items": [...]}],
+     "gaps": [{"name", "method", "from", "at", "missing", "to", "orphan"?}], "mismatches": mismatch_list(...)}."""
     nodes = {n.id: n for n in actual.nodes}
 
     def lang(node_id: str, fallback: str = "") -> str:
@@ -1323,18 +2440,21 @@ def summary(actual: ActualMap) -> Dict[str, list]:
         parent = nodes.get(node.parent_id or "")
         return f"{parent.name}.{node.name}" if parent is not None and parent.kind == "class" else node.name
 
-    out: Dict[str, list] = {"groups": [], "gaps": []}
+    out: Dict[str, list] = {"groups": [], "gaps": [], "mismatches": mismatch_list(actual)}
     for e in gaps(actual):
         b = e.bridge or {}
         to = b.get("to") or {}
-        out["gaps"].append({"name": b.get("name"), "method": b.get("method"), "missing": b.get("missing"),
-                            "from": lang(e.from_id, e.location.path if e.location else ""),
-                            "at": f"{e.location.path}:{e.location.line}" if e.location else "",
-                            "to": f"{to.get('path')}:{to.get('line')}" if to else ""})
+        gap = {"name": b.get("name"), "method": b.get("method"), "missing": b.get("missing"),
+               "from": lang(e.from_id, e.location.path if e.location else ""),
+               "at": f"{e.location.path}:{e.location.line}" if e.location else "",
+               "to": f"{to.get('path')}:{to.get('line')}" if to else ""}
+        if b.get("orphan"):
+            gap["orphan"] = dict(b["orphan"])
+        out["gaps"].append(gap)
     groups: Dict[Tuple[str, str], Dict[str, dict]] = {}
     for e in bridge_edges(actual):
         b = e.bridge or {}
-        if b.get("missing"):
+        if not _is_link(e):
             continue
         via = str(b.get("via"))
         src_lang = lang(e.from_id, e.location.path if e.location else "")
@@ -1362,14 +2482,31 @@ def summary(actual: ActualMap) -> Dict[str, list]:
     return out
 
 
+def _unsent(orphan: Optional[dict]) -> str:
+    """` (Android handles "relase" at …/ControlHandler.kt:24, which no Dart code sends)` after a gap: a fact
+    beside the gap, never a claim that it is the method meant."""
+    if not orphan:
+        return ""
+    who = platform_name(str(orphan["platform"])) if orphan.get("platform") else "it"
+    return f' ({who} handles "{orphan.get("method")}" at {orphan.get("path")}:{orphan.get("line")}, which no Dart ' \
+           "code sends)"
+
+
+def _gap_line(gap: dict) -> str:
+    where = f" ({gap['to']})" if gap["to"] else ""
+    unsent = _unsent(gap.get("orphan"))
+    return (f"[GAP] channel {gap['name']}: \"{gap['method']}\" is called from {gap['from']} ({gap['at']}) "
+            f"but {gap['missing']} does not handle it{where}{unsent}")
+
+
 def summary_lines(actual: ActualMap, limit: int = 14) -> List[str]:
-    """One line per channel or kind of link, gaps first; for the agent overview and `pmap check`."""
+    """One line per channel or kind of link: gaps first, then mismatches; for the agent overview and `pmap check`."""
     data = summary(actual)
-    lines: List[str] = []
-    for gap in data["gaps"]:
-        where = f" ({gap['to']})" if gap["to"] else ""
-        lines.append(f"[GAP] channel {gap['name']}: \"{gap['method']}\" is called from {gap['from']} ({gap['at']}) "
-                     f"but {gap['missing']} does not handle it{where}")
+    lines: List[str] = [_gap_line(gap) for gap in data["gaps"]]
+    found = data["mismatches"]
+    lines.extend(f"[MISMATCH] {m.get('short') or m['text']}" for m in found[:_OVERVIEW_MISMATCHES])
+    if len(found) > _OVERVIEW_MISMATCHES:  # the link groups keep their place in the overview's budget
+        lines.append(f"[MISMATCH] +{len(found) - _OVERVIEW_MISMATCHES} more: `pmap check` lists them")
     for g in data["groups"]:
         dirs = "; ".join(f"{src} → {', '.join(dst)}" for src, dst in g["dirs"])
         items = g["items"]

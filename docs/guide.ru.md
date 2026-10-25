@@ -373,6 +373,7 @@ pmap html /путь/к/проекту -o map.html
 | `pmap show ССЫЛКА` | один узел со связями и пользователями | `--repo` |
 | `pmap source ССЫЛКА` | исходный код одного узла | `--repo`, `--context N` |
 | `pmap check ПАПКА` | сверить с `design.yaml`; перечислить пропуски между языками | `--design`, `--json`, `--strict`, `--include-type-only` |
+| `pmap twins ПАПКА` | найти одну логику, написанную вручную на нескольких языках; `--exec` запускает копии на одних входах и сравнивает вывод | `--exec`, `--config ФАЙЛ`, `--strict`, `--json`, `--md`, `--min-score` |
 | `pmap stale ПАПКА` | что изменилось после последнего скана | `--json` |
 | `pmap mermaid ПАПКА` | схема Mermaid | `--level subsystem\|module`, `--design` |
 | `pmap mcp` | MCP-сервер через stdio | `--repo` |

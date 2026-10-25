@@ -212,7 +212,7 @@ def format_agent_context(
     if links:
         # Calls no compiler checks (channel and symbol names); an agent changing one side must change the other.
         header_lines.append("Links between languages (`pmap show <node>` lists both ends):")
-        header_lines.extend(line if line.startswith("[GAP]") else f"- {line}" for line in links)
+        header_lines.extend(line if line.startswith(("[GAP]", "[MISMATCH]")) else f"- {line}" for line in links)
     if design is not None and design.source == "mdm":
         # The mDm scheme is the design: the agent sees which function lives where before reading code.
         header_lines.append("Scheme (mDm, PROJECT.mdm): functions and objects linked to code with `код:`")
