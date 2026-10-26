@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2 — 2026-10-27
+
+Two fixes to the note after an edit, both found by replaying the 25 edits Codex made in a 48-run benchmark:
+
+- A Codex patch whose hunk has unchanged lines between its changes was not undone, so the note could not tell what the edit changed and kept showing a JNI difference the edit had just fixed. Each hunk is now undone as one block, unchanged lines included; on the replayed edits the note now says `✓ the two sides agree now` there.
+- An edit that changed several files at once (a C function, its header and every call) was compared one file at a time, so a change that kept every side in agreement was reported as `✓ the two sides agree now`. All files of one edit are now put back together before the comparison; that edit now gets no such line.
+
 ## 0.6.1 — 2026-10-26
 
 - **The note after an edit says what the edit changed between languages**: a gap it closed or opened, a JNI or C function whose two sides now agree or differ. The files on that link (both ends, the files that spell out its name, the Dart helpers that send on the channel) are mapped twice, with the edited file as it was and as it is, so the line comes from the edit alone; a link those files cannot show is missed, not guessed. The old text is rebuilt from the Edit or apply_patch that made the change; after a whole-file Write the note says nothing about it. About 0.1 s on a plugin and 0.4 s on the 3,000 files of the Flutter SDK's packages. In the cross-language benchmark the note had said nothing on the fixes in the Kotlin and C++ channel handlers; on those fixes it now says `✓ gap closed: …`, and on the Rust side of a JNI fix `✓ the two sides agree now: …`. A fix to the keys of an event payload still gets no such line: the map does not compare payload keys.

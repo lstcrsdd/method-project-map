@@ -368,12 +368,15 @@ def _undo_patch(patch: str, cwd: Path, path: Path, now: Optional[str]) -> Option
             elif line.startswith("*** Move to:") and action:
                 return None
             continue
-        if action == "Update":
+        if action == "Update":  # context lines belong to both sides of the hunk, so it is undone as one block
             if line.startswith("-"):
                 old.append(line[1:])
             elif line.startswith("+"):
                 new.append(line[1:])
-    if now is None or not hunks:
+            else:
+                old.append(line[1:] if line.startswith(" ") else line)
+                new.append(old[-1])
+    if now is None or not hunks or all(before == after for before, after in hunks):
         return None
     for before, after in reversed(hunks):
         if not after.strip() or now.count(after) != 1:
@@ -389,26 +392,28 @@ MAX_DELTA_FILES = 60  # the files mapped twice (before and after) for one edit
 MAX_NAMING_FILES = 5000  # files searched for a link's name (a constant, a registration) within one hook
 
 
-def link_changes(root: Path, index: "_Index", rel: str, before: Optional[str],
+def link_changes(root: Path, index: "_Index", edited: Dict[str, Optional[str]],
                  fresh: Optional[Dict[str, Set[tuple]]] = None) -> List[str]:
-    """Gaps and differing signatures between languages that this edit of `rel` closed or opened: the files on the
-    links `rel` takes part in are mapped twice, with `rel` before and after the edit, so anything the two maps
+    """Gaps and differing signatures between languages that one edit closed or opened. `edited` maps every file the
+    edit wrote (relative path) to its text before the edit ("" when the edit created it). The files on the links
+    they take part in are mapped twice, with all edited files as they were and as they are, so anything the two maps
     disagree on comes from the edit alone. Files outside that set are not read, so a link they would complete is
-    missed, never invented. `fresh` gets {link name: the gaps and differences found after the edit}: the cached
-    map may still hold what the edit just fixed."""
+    missed, never invented. `fresh` gets {link name: the links, gaps and differences found after the edit}: the
+    cached map may still hold what the edit just undid."""
     from pmap import langs
 
-    if before is None or Path(rel).suffix not in langs.EXT_TO_LANGUAGE:
-        return []
+    edited = {rel: text for rel, text in edited.items() if Path(rel).suffix in langs.EXT_TO_LANGUAGE}
+    if not edited or any(text is None for text in edited.values()):
+        return []  # one file's old text is unknown: the state before the edit cannot be rebuilt
     names, channels = set(), False
     for e in index.bridged:
         b = e.bridge or {}
-        if rel in (index.path(e.from_id), e.location.path if e.location else "", (b.get("to") or {}).get("path")):
+        if set(edited) & {index.path(e.from_id), e.location.path if e.location else "", (b.get("to") or {}).get("path")}:
             names.add(str(b.get("name")))
             channels = channels or b.get("via") in ("channel", "event-channel", "message-channel")
     if not names:
         return []
-    files = {rel}
+    files = set(edited)
     for e in index.bridged:
         b = e.bridge or {}
         if str(b.get("name")) in names:
@@ -418,17 +423,17 @@ def link_changes(root: Path, index: "_Index", rel: str, before: Optional[str],
                       if channels else ())
     files |= _naming(root, index, names, packages)  # where the names are spelled out: constants, registrations
     helpers = {index.path(t) for f in files for n in index.by_file.get(f, []) for t in index.calls_from.get(n.id, ())}
-    files = {f for f in files if Path(f).suffix in langs.EXT_TO_LANGUAGE and (root / f).is_file() or f == rel}
+    files = {f for f in files if Path(f).suffix in langs.EXT_TO_LANGUAGE and (root / f).is_file() or f in edited}
     helpers = {f for f in helpers - files if Path(f).suffix in langs.EXT_TO_LANGUAGE and (root / f).is_file()}
     if len(files) > MAX_DELTA_FILES:
         return []
     if len(files) + len(helpers) <= MAX_DELTA_FILES:  # what the callers call: helpers that pass a method name on
         files |= helpers
     lang = {f: langs.EXT_TO_LANGUAGE[Path(f).suffix] for f in files}
-    others = [(f, lang[f], root / f) for f in sorted(files) if f != rel]
-    now = root / rel
-    then = [(rel, lang[rel], before.encode("utf-8"))] if before else []
-    after, links = _problems(root, others + ([(rel, lang[rel], now)] if now.is_file() else []))
+    others = [(f, lang[f], root / f) for f in sorted(files) if f not in edited]
+    now = [(f, lang[f], root / f) for f in sorted(edited) if (root / f).is_file()]
+    then = [(f, lang[f], str(text).encode("utf-8")) for f, text in sorted(edited.items()) if text]
+    after, links = _problems(root, others + now)
     was, _ = _problems(root, others + then)
     if fresh is not None:
         for name in names:
@@ -785,12 +790,12 @@ def post_edit_context(payload: dict) -> Optional[str]:
         index = _Index.from_map(actual)
     deltas: List[str] = []
     fresh: Dict[str, Set[tuple]] = {}
-    for path in dict.fromkeys(c.path for c in changes):
-        try:
-            rel = path.resolve().relative_to(root.resolve()).as_posix()
-            deltas += link_changes(root, index, rel, text_before(payload, path), fresh)
-        except Exception:  # a note is never worth a failed hook
-            continue
+    try:
+        edited = {path.resolve().relative_to(root.resolve()).as_posix(): text_before(payload, path)
+                  for path in dict.fromkeys(c.path for c in changes) if root.resolve() in path.resolve().parents}
+        deltas = link_changes(root, index, edited, fresh)
+    except Exception:  # a note is never worth a failed hook
+        deltas = []
     session = str(payload.get("session_id") or "")
     seen = _seen(session)
     twins = load_twins(root)

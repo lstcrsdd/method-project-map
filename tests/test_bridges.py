@@ -1122,6 +1122,46 @@ class TestPostEditNote(unittest.TestCase):
         text = self.note(dict(self.change(rel, head + ", fade_ms: jint) {", head + ") {"), session_id="s2"))
         self.assertIn("✓ the two sides agree now: JNI NativeCore.stop", text)
 
+    def patch(self, files: dict) -> dict:
+        """A Codex apply_patch payload with one hunk per file, {rel: [(prefix, line), ...]}, applied on disk."""
+        text = "*** Begin Patch\n"
+        for rel, lines in files.items():
+            path = self.root / rel
+            before = "\n".join(line for kind, line in lines if kind in " -")
+            after = "\n".join(line for kind, line in lines if kind in " +")
+            body = path.read_text(encoding="utf-8")
+            self.assertEqual(body.count(before), 1, rel)
+            path.write_text(body.replace(before, after), encoding="utf-8")
+            text += f"*** Update File: {rel}\n@@\n" + "".join(f"{kind}{line}\n" for kind, line in lines)
+        return {"tool_name": "apply_patch", "tool_input": {"command": text + "*** End Patch"}, "session_id": "codex"}
+
+    STOP = 'pub extern "system" fn Java_com_example_player_NativeCore_stop(_env: JNIEnv, _class: JClass'
+
+    def test_patch_with_context_between_its_changes(self) -> None:
+        path = self.root / "rust/src/ffi.rs"
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            self.STOP + ") {\n", self.STOP + ", fade_ms: jint) {\n    let _ = fade_ms;\n"), encoding="utf-8")
+        hints.current_map(self.root)  # the cached map holds the difference
+        text = self.note(self.patch({"rust/src/ffi.rs": [
+            ("-", self.STOP + ", fade_ms: jint) {"), ("+", self.STOP + ") {"), ("-", "    let _ = fade_ms;"),
+            (" ", "    engine::stop();"), ("+", "    // at once"), (" ", "}")]}))
+        self.assertIn("✓ the two sides agree now: JNI NativeCore.stop", text)
+        self.assertNotIn("✗", text)
+
+    def test_one_patch_over_every_side_is_compared_as_a_whole(self) -> None:
+        hints.current_map(self.root)
+        text = self.note(self.patch({
+            "rust/src/ffi.rs": [("-", 'pub extern "C" fn player_core_start(profile: *const c_char) -> i32 {'),
+                                ("+", 'pub extern "C" fn player_core_start(profile: *const c_char, rate: u32) -> i32 {')],
+            "native/player_core.h": [("-", "int32_t player_core_start(const char *config);"),
+                                     ("+", "int32_t player_core_start(const char *config, uint32_t rate);")],
+            "macos/Runner/ExtensionController.swift": [("-", "    guard player_core_start(server) == 0 else {"),
+                                                       ("+", "    guard player_core_start(server, 44100) == 0 else {")],
+            "windows/runner/player_channel.cpp": [
+                ("-", "    result->Success(flutter::EncodableValue(player_core_start(server.c_str()) == 0));"),
+                ("+", "    result->Success(flutter::EncodableValue(player_core_start(server.c_str(), 44100) == 0));")]}))
+        self.assertNotIn("two sides", text)  # they agreed before the patch and agree after it
+
     def test_write_cannot_tell_what_changed(self) -> None:
         hints.current_map(self.root)
         path = self.root / self.KOTLIN
