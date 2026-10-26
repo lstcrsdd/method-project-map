@@ -229,6 +229,15 @@ This installs, for Claude Code and Codex:
       lib/ui/controls.dart:23  Controls.onPause
   ```
 
+  When the edit changes a link between languages, the note says so first. The files on that link are mapped twice, before and after the edit, so the line comes from the edit alone. Adding the missing branch to the Windows side of the example plugin gives:
+
+  ```text
+  This edit changed what the map finds between languages:
+    ✓ gap closed: channel audio/player "setSpeed" is handled in C/C++ (windows) now
+  ```
+
+  A rename on one side gives `✗ new gap: …` for each platform it breaks, and a JNI or C function whose parameters stop matching gives `✗ the two sides differ now: …`. After a whole-file Write the old text is unknown, so the note says nothing about what changed.
+
 - a short **overview at session start** (a `SessionStart` hook): languages, links between languages and gaps, then packages and files;
 - a skill, a rule, and an MCP server with the tools `pmap_overview`, `pmap_find`, `pmap_show`, `pmap_source`, `pmap_check`, `pmap_stale` and `pmap_scan`.
 

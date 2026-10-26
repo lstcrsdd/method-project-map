@@ -195,6 +195,15 @@ pmap connect --claude      # или --codex, --gemini, --all; отменить: 
       lib/ui/controls.dart:23  Controls.onPause
   ```
 
+  Если правка меняет связь между языками, заметка начинается с этого. Файлы этой связи размечаются дважды, до правки и после неё, поэтому строка отражает только саму правку. Если в плагине из примера добавить недостающую ветку на стороне Windows, заметка скажет:
+
+  ```text
+  This edit changed what the map finds between languages:
+    ✓ gap closed: channel audio/player "setSpeed" is handled in C/C++ (windows) now
+  ```
+
+  Переименование на одной стороне даёт `✗ new gap: …` для каждой платформы, на которой вызов теперь падает. Если параметры функции JNI или C перестали совпадать, будет `✗ the two sides differ now: …`. После полной перезаписи файла (Write) старый текст неизвестен, и заметка об изменениях связей молчит.
+
 - короткий **обзор в начале сессии** (хук `SessionStart`): языки, мосты между ними и пропуски, затем пакеты и файлы;
 - навык, правило и MCP-сервер с инструментами `pmap_overview`, `pmap_find`, `pmap_show`, `pmap_source`, `pmap_check`, `pmap_stale` и `pmap_scan`.
 

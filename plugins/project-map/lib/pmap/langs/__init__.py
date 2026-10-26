@@ -104,15 +104,20 @@ class LanguageScan:
 
 
 def scan(repo_root: Path, ignore: Optional[List[str]] = None) -> LanguageScan:
+    return scan_sources(repo_root, [(rel, language, path) for path, rel, language in discover(repo_root, ignore)])
+
+
+def scan_sources(repo_root: Path, files: List[Tuple[str, str, object]]) -> LanguageScan:
+    """Map the files given as (relative path, language, absolute path or contents as bytes). `scan` reads every
+    file of the project; the note after an edit maps a few files twice, before and after the edit."""
     from pmap.langs import bridges, cfamily, csharp, dart, golang, javascript, jvm, rust, swift
     from pmap.langs.resolve import Resolver
 
     extractors = {"typescript": javascript, "javascript": javascript, "go": golang, "java": jvm, "kotlin": jvm,
                   "csharp": csharp, "swift": swift, "dart": dart, "rust": rust, "cpp": cfamily}
     result = LanguageScan()
-    files = discover(repo_root, ignore)
     counts: Dict[str, int] = {}
-    for _path, _rel, language in files:
+    for _rel, language, _src in files:
         counts[language] = counts.get(language, 0) + 1
     ready = {lang: available(lang) for lang in counts}
     for lang, n in sorted(counts.items()):
@@ -120,11 +125,11 @@ def scan(repo_root: Path, ignore: Optional[List[str]] = None) -> LanguageScan:
     facts_list = []
     hashes: Dict[str, str] = {}
     sources: Dict[str, bytes] = {}  # files that may hold links between languages (pmap/langs/bridges.py)
-    for path, rel, language in files:
+    for rel, language, given in files:
         if not ready[language]:
             continue
         try:
-            src = path.read_bytes()
+            src = given if isinstance(given, bytes) else Path(str(given)).read_bytes()
         except OSError as exc:
             result.errors.append(ScanError(path=rel, kind="decode_error", message=str(exc)))
             continue

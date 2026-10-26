@@ -480,6 +480,18 @@ class TestFixture(unittest.TestCase):
         self.assertEqual(json.loads(out.getvalue())["groups"], [])
 
 
+@needs("dart", "swift", "kotlin", "cpp", "rust")
+class TestChannelHandlersAreNotCopies(unittest.TestCase):
+    """Each platform's handler of one Flutter channel names the same methods; that is the two ends of a link (a
+    missing branch is a gap), not a copy."""
+
+    def test_handlers_of_one_channel_are_left_out(self) -> None:
+        root = Path(__file__).resolve().parent / "fixtures" / "langs" / "flutter_player"
+        groups = twins.find_twins(ProjectScanner().scan_repository(root), root)
+        names = {m.name for g in groups for m in g.members}
+        self.assertFalse(names & {"handle", "HandleMethodCall", "PlayerChannel::HandleMethodCall"}, groups)
+
+
 @needs("swift", "rust", "kotlin")
 class TestPostEditNote(unittest.TestCase):
     def setUp(self) -> None:

@@ -1081,11 +1081,94 @@ class TestPostEditNote(unittest.TestCase):
         self.assertIn("start (rust/src/engine.rs:9)\n  used in 2 places in 1 other file (rust/src/ffi.rs:18, "
                       "rust/src/ffi.rs:52)", text)
 
+    def change(self, rel: str, old: str, new: str) -> dict:
+        """Make the edit on disk, as the agent's tool did, and return its Edit payload."""
+        path = self.root / rel
+        text = path.read_text(encoding="utf-8")
+        self.assertEqual(text.count(old), 1)
+        path.write_text(text.replace(old, new), encoding="utf-8")
+        return {"tool_name": "Edit", "tool_input": {"file_path": str(path), "old_string": old, "new_string": new}}
+
+    KOTLIN = "android/app/src/main/kotlin/com/example/player/MainActivity.kt"
+
+    def test_edit_that_closes_a_gap_says_so(self) -> None:
+        hints.current_map(self.root)  # the map a session start leaves, with the "status" gap on Android
+        text = self.note(self.change(self.KOTLIN, '                "disconnect" -> {',
+                                     '                "status" -> result.success("stopped")\n'
+                                     '                "disconnect" -> {'))
+        self.assertIn('✓ gap closed: channel audio/player "status" is handled in Kotlin (android) now', text)
+        self.assertNotIn("is not handled", text)
+
+    def test_renamed_dart_call_opens_gaps_and_drops_the_old_links(self) -> None:
+        hints.current_map(self.root)
+        rel = "lib/player/platform_player.dart"
+        old = "  Future<void> disconnect() => _control.invokeMethod('disconnect');"
+        new = "  Future<void> disconnect() => _control.invokeMethod('disconect');"
+        self.change(rel, old, new)
+        patch = f"*** Begin Patch\n*** Update File: {rel}\n@@\n-{old}\n+{new}\n*** End Patch"
+        text = self.note({"tool_name": "apply_patch", "tool_input": {"command": patch}, "session_id": "codex"})
+        for platform in ("Kotlin (android)", "Swift (macos)", "C/C++ (windows)"):
+            self.assertIn(f'✗ new gap: channel audio/player: "disconect" is called from Dart ({rel}:21) but {platform} '
+                          "does not handle it", text)
+        self.assertNotIn('"disconnect")', text)  # the links the cached map still holds are gone
+
+    def test_jni_signature_that_starts_or_stops_differing(self) -> None:
+        hints.current_map(self.root)
+        rel = "rust/src/ffi.rs"
+        head = 'pub extern "system" fn Java_com_example_player_NativeCore_stop(_env: JNIEnv, _class: JClass'
+        text = self.note(self.change(rel, head + ") {", head + ", fade_ms: jint) {"))
+        self.assertIn("✗ the two sides differ now: JNI NativeCore.stop: Kotlin declares 0 parameters", text)
+        hints.current_map(self.root)
+        text = self.note(dict(self.change(rel, head + ", fade_ms: jint) {", head + ") {"), session_id="s2"))
+        self.assertIn("✓ the two sides agree now: JNI NativeCore.stop", text)
+
+    def test_write_cannot_tell_what_changed(self) -> None:
+        hints.current_map(self.root)
+        path = self.root / self.KOTLIN
+        path.write_text(path.read_text(encoding="utf-8").replace('"disconnect" -> {', '"status" -> result.success("x")\n'
+                                                                  '                "disconnect" -> {'), encoding="utf-8")
+        text = self.note({"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "..."}})
+        self.assertNotIn("gap closed", text)
+
     def test_silent_without_users_elsewhere(self) -> None:
         self.assertEqual(self.note(self.edit("lib/main.dart",
                                              "    return MaterialApp(home: HomePage(controller: controller));")), "")
         self.assertEqual(self.note({"tool_name": "Write", "tool_input": {"file_path": str(self.root / "README.md"),
                                                                         "content": "x"}}), "")
+
+
+class TestTextBeforeTheEdit(unittest.TestCase):
+    """The note compares the links before and after an edit: the old text is rebuilt only when that is certain."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.file = self.tmp / "a.kt"
+        self.file.write_text("val a = 1\nval b = 2\nval c = 2\n", encoding="utf-8")
+
+    def before(self, data: dict):
+        return hints.text_before({"cwd": str(self.tmp), "tool_input": data}, self.file)
+
+    def test_edit_multiedit_and_replace_all(self) -> None:
+        self.assertEqual(self.before({"file_path": "a.kt", "old_string": "val a = 0", "new_string": "val a = 1"}),
+                         "val a = 0\nval b = 2\nval c = 2\n")
+        self.assertEqual(self.before({"file_path": str(self.file), "edits": [
+            {"old_string": "val a = 0", "new_string": "val a = 1"}, {"old_string": "val b = 0", "new_string": "val b = 2"}]}),
+            "val a = 0\nval b = 0\nval c = 2\n")
+        self.assertEqual(self.before({"file_path": "a.kt", "old_string": "= 3", "new_string": "= 2", "replace_all": True}),
+                         "val a = 1\nval b = 3\nval c = 3\n")
+
+    def test_uncertain_cases_give_none(self) -> None:
+        self.assertIsNone(self.before({"file_path": "a.kt", "old_string": "= 3", "new_string": "= 2"}))  # twice
+        self.assertIsNone(self.before({"file_path": "a.kt", "old_string": "val d = 4\n", "new_string": ""}))
+        self.assertIsNone(self.before({"file_path": "a.kt", "content": "val a = 1\n"}))  # a Write
+
+    def test_codex_patches(self) -> None:
+        patch = ("*** Begin Patch\n*** Update File: a.kt\n@@\n-val a = 0\n+val a = 1\n@@\n-val c = 3\n+val c = 2\n"
+                 "*** End Patch")
+        self.assertEqual(self.before({"command": patch}), "val a = 0\nval b = 2\nval c = 3\n")
+        self.assertEqual(self.before({"command": "*** Begin Patch\n*** Add File: a.kt\n+val a = 1\n*** End Patch"}), "")
+        self.assertIsNone(self.before({"command": "*** Begin Patch\n*** Update File: a.kt\n@@\n-x\n+= 2\n*** End Patch"}))
 
 
 class TestChangesFromPayload(unittest.TestCase):

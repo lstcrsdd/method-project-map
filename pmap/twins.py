@@ -748,11 +748,16 @@ def _called_by_name(v: FunctionVocabulary, src: Optional[_Source]) -> str:
 
 
 def linker(actual: ActualMap, hops: int = 4) -> Callable[[str, str], bool]:
-    """Whether one function reaches the other within a few proven calls or links between languages."""
+    """Whether one function reaches the other within a few proven calls or links between languages, or both
+    handle one channel (each platform's handler of a Flutter channel: gaps cover what one of them lacks)."""
     calls: Dict[str, Set[str]] = {}
+    handlers: Dict[str, Set[str]] = {}  # node -> channels it handles
     for e in actual.edges:
         if e.kind == "calls" and (e.confidence == "resolved" or (e.bridge and not e.bridge.get("missing"))):
             calls.setdefault(e.from_id, set()).add(e.to_id)
+        if e.bridge and e.bridge.get("via") in ("channel", "event-channel", "message-channel"):
+            for target in [e.to_id] + list(e.candidates or []):
+                handlers.setdefault(target, set()).add(str(e.bridge.get("name")))
 
     def reaches(a: str, b: str) -> bool:
         frontier, seen = {a}, {a}
@@ -763,7 +768,7 @@ def linker(actual: ActualMap, hops: int = 4) -> Callable[[str, str], bool]:
             seen |= frontier
         return False
 
-    return lambda a, b: reaches(a, b) or reaches(b, a)
+    return lambda a, b: bool(handlers.get(a, set()) & handlers.get(b, set())) or reaches(a, b) or reaches(b, a)
 
 
 def _bridged_from(actual: ActualMap, paths: Dict[str, str]) -> Dict[str, Set[str]]:

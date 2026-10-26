@@ -323,6 +323,201 @@ def _patch_changes(patch: str, cwd: Path) -> List[Change]:
     return out
 
 
+def text_before(payload: dict, path: Path) -> Optional[str]:
+    """The file as it was before the edit, rebuilt by undoing the edit on what is on disk now; "" when the edit
+    created it. None when that is not certain: a Write (the old text is not in the payload), a deletion with nothing
+    to anchor it, a replacement that appears more than once."""
+    data = payload.get("tool_input")
+    cwd = Path(str(payload.get("cwd") or os.getcwd()))
+    if not isinstance(data, dict):
+        data = {"command": data} if isinstance(data, (str, list)) else {}
+    now = _read(path) if path.exists() else None
+    patch = next((v for v in _strings(data) if "*** Begin Patch" in v), None)
+    if patch is not None:
+        return _undo_patch(patch, cwd, path, now)
+    if now is None or _abs(data.get("file_path"), cwd) != path or "old_string" not in data and "edits" not in data:
+        return None
+    for edit in reversed(data.get("edits") if isinstance(data.get("edits"), list) else [data]):
+        if not isinstance(edit, dict):
+            return None
+        old, new = str(edit.get("old_string") or ""), str(edit.get("new_string") or "")
+        if not new or (now.count(new) != 1 and not edit.get("replace_all")) or new not in now:
+            return None
+        now = now.replace(new, old) if edit.get("replace_all") else now.replace(new, old, 1)
+    return now
+
+
+def _undo_patch(patch: str, cwd: Path, path: Path, now: Optional[str]) -> Optional[str]:
+    hunks: List[Tuple[str, str]] = []
+    action = None
+    old: List[str] = []
+    new: List[str] = []
+    for line in patch.splitlines() + ["*** End Patch"]:
+        m = re.match(r"\*\*\* (Update|Add|Delete) File: (.+)", line)
+        if m or line.startswith("@@") or line.startswith("*** "):
+            if action == "Update" and (old or new):
+                hunks.append(("\n".join(old), "\n".join(new)))
+            old, new = [], []
+            if m:
+                target = _abs(m.group(2).strip(), cwd)
+                action = m.group(1) if target is not None and target.resolve() == path.resolve() else None
+                if action == "Add":
+                    return ""
+                if action == "Delete":
+                    return None
+            elif line.startswith("*** Move to:") and action:
+                return None
+            continue
+        if action == "Update":
+            if line.startswith("-"):
+                old.append(line[1:])
+            elif line.startswith("+"):
+                new.append(line[1:])
+    if now is None or not hunks:
+        return None
+    for before, after in reversed(hunks):
+        if not after.strip() or now.count(after) != 1:
+            return None
+        now = now.replace(after, before, 1)
+    return now
+
+
+# ====================================================================== what it did to the links between languages
+
+
+MAX_DELTA_FILES = 60  # the files mapped twice (before and after) for one edit
+MAX_NAMING_FILES = 5000  # files searched for a link's name (a constant, a registration) within one hook
+
+
+def link_changes(root: Path, index: "_Index", rel: str, before: Optional[str],
+                 fresh: Optional[Dict[str, Set[tuple]]] = None) -> List[str]:
+    """Gaps and differing signatures between languages that this edit of `rel` closed or opened: the files on the
+    links `rel` takes part in are mapped twice, with `rel` before and after the edit, so anything the two maps
+    disagree on comes from the edit alone. Files outside that set are not read, so a link they would complete is
+    missed, never invented. `fresh` gets {link name: the gaps and differences found after the edit}: the cached
+    map may still hold what the edit just fixed."""
+    from pmap import langs
+
+    if before is None or Path(rel).suffix not in langs.EXT_TO_LANGUAGE:
+        return []
+    names, channels = set(), False
+    for e in index.bridged:
+        b = e.bridge or {}
+        if rel in (index.path(e.from_id), e.location.path if e.location else "", (b.get("to") or {}).get("path")):
+            names.add(str(b.get("name")))
+            channels = channels or b.get("via") in ("channel", "event-channel", "message-channel")
+    if not names:
+        return []
+    files = {rel}
+    for e in index.bridged:
+        b = e.bridge or {}
+        if str(b.get("name")) in names:
+            files.update(p for p in (index.path(e.from_id), e.location.path if e.location else "",
+                                     (b.get("to") or {}).get("path"), index.path(e.to_id)) if p)
+    packages = sorted({p for f in files if f.endswith(".dart") for p in [_dart_package(root, f)] if p is not None}
+                      if channels else ())
+    files |= _naming(root, index, names, packages)  # where the names are spelled out: constants, registrations
+    helpers = {index.path(t) for f in files for n in index.by_file.get(f, []) for t in index.calls_from.get(n.id, ())}
+    files = {f for f in files if Path(f).suffix in langs.EXT_TO_LANGUAGE and (root / f).is_file() or f == rel}
+    helpers = {f for f in helpers - files if Path(f).suffix in langs.EXT_TO_LANGUAGE and (root / f).is_file()}
+    if len(files) > MAX_DELTA_FILES:
+        return []
+    if len(files) + len(helpers) <= MAX_DELTA_FILES:  # what the callers call: helpers that pass a method name on
+        files |= helpers
+    lang = {f: langs.EXT_TO_LANGUAGE[Path(f).suffix] for f in files}
+    others = [(f, lang[f], root / f) for f in sorted(files) if f != rel]
+    now = root / rel
+    then = [(rel, lang[rel], before.encode("utf-8"))] if before else []
+    after, links = _problems(root, others + ([(rel, lang[rel], now)] if now.is_file() else []))
+    was, _ = _problems(root, others + then)
+    if fresh is not None:
+        for name in names:
+            fresh.setdefault(name, set()).update(k for k in list(after) + links if k[1] == name)
+    lines = []
+    for key in sorted(set(was) - set(after)):
+        if key[0] == "gap":
+            lines.append(f'  ✓ gap closed: channel {key[1]} "{key[2]}" is handled in {key[3]} now')
+        else:
+            lines.append(f"  ✓ the two sides agree now: {was[key].split(': ', 1)[0]}")
+    for key in sorted(set(after) - set(was)):
+        if key[0] == "gap":
+            lines.append(f"  ✗ new gap: {after[key]} — a call fails there at run time")
+        else:
+            lines.append(f"  ✗ the two sides differ now: {after[key]}")
+    return lines
+
+
+_DART_SENDS = (b"invokeMethod", b"invokeListMethod", b"invokeMapMethod", b"receiveBroadcastStream")
+
+
+def _dart_package(root: Path, rel: str) -> Optional[str]:
+    """The folder (relative to root) of the Dart package `rel` belongs to: the nearest pubspec.yaml above it."""
+    parts = rel.split("/")[:-1]
+    while parts:
+        if (root.joinpath(*parts) / "pubspec.yaml").is_file():
+            return "/".join(parts) + "/"
+        parts.pop()
+    return "" if (root / "pubspec.yaml").is_file() else None
+
+
+def _naming(root: Path, index: "_Index", names: Set[str], packages: Sequence[str] = ()) -> Set[str]:
+    """The mapped files (not Python) whose text holds one of `names` (a channel name, a C or JNI symbol) and the Dart
+    files of `packages` that send on a channel (a helper such as `extension on MethodChannel` takes the method name
+    from its callers); none in a project too big to read them all within a hook."""
+    from pmap import langs
+
+    paths = sorted({n.location.path for n in index.nodes.values() if n.location is not None
+                    and Path(n.location.path).suffix in langs.EXT_TO_LANGUAGE})
+    if len(paths) > MAX_NAMING_FILES:
+        return set()
+    wanted = [n.encode("utf-8") for n in names if n and n != "None"]
+    found = set()
+    for rel in paths:
+        try:
+            src = (root / rel).read_bytes()
+        except OSError:
+            continue
+        if any(w in src for w in wanted) or rel.endswith(".dart") and rel.startswith(tuple(packages)) \
+                and any(w in src for w in _DART_SENDS):
+            found.add(rel)
+    return found
+
+
+def _link_key(e) -> tuple:
+    """A link from one declaration to a file, whatever its line numbers."""
+    b = e.bridge or {}
+    return ("link", str(b.get("name")), b.get("method"), e.from_id, (b.get("to") or {}).get("path"))
+
+
+def _problem_key(bridge: dict) -> Optional[tuple]:
+    """The key `_problems` gives a gap or a difference, from a link's `bridge` data."""
+    m = bridge.get("mismatch")
+    if m:
+        d = m.get("detail") or {}
+        return (m.get("kind"), str(bridge.get("name")), str(d.get("platform") or d.get("label") or ""))
+    if bridge.get("missing"):
+        return ("gap", bridge.get("name"), bridge.get("method"), bridge.get("missing"))
+    return None
+
+
+def _problems(root: Path, files: list) -> Tuple[Dict[tuple, str], List[tuple]]:
+    """{key that survives line shifts: one line about it} for the gaps and differences between `files`, and the
+    keys of the links found between them."""
+    from types import SimpleNamespace
+
+    from pmap.langs import bridges, scan_sources
+
+    found = scan_sources(root, files)
+    data = bridges.summary(SimpleNamespace(nodes=found.nodes, edges=found.edges))
+    out: Dict[tuple, str] = {}
+    for g in data["gaps"]:
+        out[("gap", g["name"], g["method"], g["missing"])] = bridges._gap_line(g)[len("[GAP] "):]
+    for m in data["mismatches"]:
+        d = m.get("detail") or {}
+        out[(m["kind"], m["name"], str(d.get("platform") or d.get("label") or ""))] = str(m["text"])
+    return out, [_link_key(e) for e in found.edges if e.bridge and not e.bridge.get("missing")]
+
+
 # ====================================================================== who depends on it
 
 
@@ -375,9 +570,13 @@ class _Index:
         self.outgoing_links: Dict[str, List[ActualEdge]] = {}
         self.ffi: Dict[str, List[ActualEdge]] = {}  # C symbol -> the calls that reach its definition
         self.headers: Dict[str, List[ActualNode]] = {}  # name -> C / C++ header declarations
+        self.bridged = [e for e in edges if e.bridge]  # links between languages, gaps and differences
+        self.calls_from: Dict[str, Set[str]] = {}  # declaration -> what it calls (helpers that send a method name)
         for e in edges:
             if e.kind not in ("calls", "inherits"):
                 continue
+            if not e.bridge and e.confidence in ("resolved", "inferred"):
+                self.calls_from.setdefault(e.from_id, set()).add(e.to_id)
             for target in ({e.to_id} | set(e.candidates or [])):
                 self.incoming.setdefault(target, []).append(e)
             if e.bridge:
@@ -423,11 +622,22 @@ class _Index:
                 out[n.id] = (n, True)
         return list(out.values())
 
-    def note(self, node: ActualNode, signature: bool, change: Change) -> List[str]:
+    def note(self, node: ActualNode, signature: bool, change: Change,
+             fresh: Optional[Dict[str, Set[tuple]]] = None) -> List[str]:
         rel = node.location.path
         lines: List[str] = []
-        links_out = [e for e in self.outgoing_links.get(node.id, [])]
-        links_in = [e for e in self.incoming.get(node.id, []) if e.bridge and not e.bridge.get("missing")]
+
+        def resolved(e, problem: bool = False) -> bool:  # what the cached map holds and the edit has just undone
+            b = e.bridge or {}
+            name = str(b.get("name"))
+            if not fresh or name not in fresh:
+                return False
+            key = _problem_key(b) if problem or b.get("missing") else _link_key(e)
+            return key not in fresh[name]
+
+        links_out = [e for e in self.outgoing_links.get(node.id, []) if not resolved(e)]
+        links_in = [e for e in self.incoming.get(node.id, []) if e.bridge and not e.bridge.get("missing")
+                    and not resolved(e)]
         if links_in and not change.whole_file and change.start and not signature:
             # A call that lands on the whole declaration (a Rust function behind FFI) concerns any edit of it;
             # one that lands on a branch (`case "connect":` of a channel handler) concerns edits of that branch.
@@ -450,12 +660,12 @@ class _Index:
             to = b.get("to") or {}
             lines.append(f"  → {to.get('path', self.path(e.to_id))}:{to.get('line', '?')}  {self.label(e.to_id)}"
                          f"  ({_lang(to.get('path', ''))}, {what}{', possible' if e.confidence != 'resolved' else ''})")
-            if b.get("mismatch"):
+            if b.get("mismatch") and not resolved(e, problem=True):
                 lines.append(f"    ✗ {mismatch_text(e)}")
         for e in links_in:
             where = f"{e.location.path}:{e.location.line}" if e.location else self.path(e.from_id)
             lines.append(f"  ← {where}  {self.label(e.from_id)}  ({_lang(where)}, {_what(e.bridge or {})})")
-            if (e.bridge or {}).get("mismatch"):
+            if (e.bridge or {}).get("mismatch") and not resolved(e, problem=True):
                 lines.append(f"    ✗ {mismatch_text(e)}")
         if links_in and any((e.bridge or {}).get("via") == "ffi" for e in links_in):
             for decl in self.headers.get(node.name, []):  # the C declaration other languages compile against
@@ -573,6 +783,14 @@ def post_edit_context(payload: dict) -> Optional[str]:
             actual = load_map(root, warn=False)
             save_cache(root, actual)
         index = _Index.from_map(actual)
+    deltas: List[str] = []
+    fresh: Dict[str, Set[tuple]] = {}
+    for path in dict.fromkeys(c.path for c in changes):
+        try:
+            rel = path.resolve().relative_to(root.resolve()).as_posix()
+            deltas += link_changes(root, index, rel, text_before(payload, path), fresh)
+        except Exception:  # a note is never worth a failed hook
+            continue
     session = str(payload.get("session_id") or "")
     seen = _seen(session)
     twins = load_twins(root)
@@ -587,7 +805,7 @@ def post_edit_context(payload: dict) -> Optional[str]:
             level = 2 if signature else 1
             if seen.get(node.id, 0) >= level:
                 continue
-            note = index.note(node, signature, change)
+            note = index.note(node, signature, change, fresh)
             depends = depends or bool(note)
             twin: List[str] = []
             if node.id in twins:
@@ -601,18 +819,20 @@ def post_edit_context(payload: dict) -> Optional[str]:
                 seen[node.id] = level
                 notes.append(note)
     refresh_in_background(root)  # the edit changed the code: the next note should see it
-    if not notes:
+    if not notes and not deltas:
         return None
     notes.sort(key=len, reverse=True)
     _remember(session, seen)
-    if depends and twinned:
+    if not depends and not twinned:
+        head = "Method Project Map — the links between languages after your edit:"
+    elif depends and twinned:
         head = ("Method Project Map — code elsewhere depends on what you just changed (keep its callers and links "
                 "in step); possible copies in other languages are listed too:")
     elif depends:
         head = "Method Project Map — code elsewhere depends on what you just changed; keep it in step:"
     else:
         head = "Method Project Map — what you just changed may have hand-written copies in other languages:"
-    out = [head]
+    out = [head] + (["This edit changed what the map finds between languages:"] + deltas if deltas else [])
     for note in notes[:MAX_SYMBOLS]:
         out.extend(note)
     if len(notes) > MAX_SYMBOLS:
